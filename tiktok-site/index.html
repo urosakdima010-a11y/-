@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ИИ ведёт: дай задание</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Unbounded:wght@600;800&display=swap">
+<style>
+/* Лендинг @ii_vedet: тёмный неон под стиль роликов; одна колонка, главная цель страницы — форма задания. */
+:root { --bg:#0d0826; --bg2:#1b1052; --ink:#f4f1ff; --dim:#b7b0e2; --pink:#ff4878; --cyan:#3cdcff; --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.16); color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: radial-gradient(120% 70% at 50% 0%, var(--bg2), var(--bg) 60%); color: var(--ink); font-family: 'Manrope', system-ui, sans-serif; min-height: 100vh; padding: 24px max(16px, env(safe-area-inset-left,0px)) 56px; line-height: 1.5; }
+.wrap { max-width: 640px; margin: 0 auto; }
+.handle { display: inline-block; font-weight: 800; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+.handle b { color: var(--cyan); }
+h1 { font: 800 clamp(34px, 9vw, 56px)/1.04 'Unbounded', sans-serif; letter-spacing: -1.5px; margin: 28px 0 14px; text-wrap: balance; }
+h1 span { color: var(--pink); text-shadow: 0 0 40px rgba(255,72,120,.55); }
+.lead { font-size: 18px; color: var(--dim); max-width: 46ch; margin: 0 0 28px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 24px; backdrop-filter: blur(8px); }
+label { display: block; font-weight: 800; font-size: 14px; letter-spacing: .5px; margin: 0 0 6px; }
+.row { margin-bottom: 18px; }
+input[type=text], textarea, select { width: 100%; font: 600 16px 'Manrope', sans-serif; color: var(--ink); background: rgba(8,5,28,.7); border: 1.5px solid var(--line); border-radius: 14px; padding: 13px 14px; }
+textarea { min-height: 120px; resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--cyan); outline-offset: 1px; }
+select option { background: #160d3d; }
+.hint { font-size: 13px; color: var(--dim); margin-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
+.check { display: flex; gap: 10px; align-items: center; font-weight: 600; font-size: 15px; }
+.check input { width: 20px; height: 20px; accent-color: var(--pink); }
+button.go { width: 100%; font: 800 18px 'Manrope', sans-serif; color: #fff; background: linear-gradient(90deg, var(--pink), #ff7a4d); border: 0; border-radius: 16px; padding: 16px; cursor: pointer; box-shadow: 0 10px 40px rgba(255,72,120,.4); }
+button.go:disabled { opacity: .6; cursor: wait; }
+button.go:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+.hp { position: absolute; left: -9999px; height: 0; overflow: hidden; }
+.msg { margin-top: 14px; font-weight: 700; padding: 12px 14px; border-radius: 12px; }
+.msg.ok { background: rgba(89,240,168,.12); border: 1px solid rgba(89,240,168,.5); color: #8cf5c4; }
+.msg.err { background: rgba(255,72,120,.12); border: 1px solid rgba(255,72,120,.5); color: #ff9cb6; }
+h2 { font: 800 13px 'Unbounded', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan); margin: 40px 0 14px; }
+.steps { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; counter-reset: s; }
+.steps li { counter-increment: s; display: flex; gap: 14px; align-items: flex-start; font-size: 16px; }
+.steps li:before { content: counter(s); flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-weight: 800; color: var(--cyan); }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.tags span { font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); }
+.rules { font-size: 14px; color: var(--dim); }
+a.tt { display: inline-block; margin-top: 18px; font-weight: 800; color: var(--ink); text-decoration: none; padding: 12px 20px; border-radius: 999px; border: 1.5px solid var(--cyan); }
+a.tt:hover { background: rgba(60,220,255,.12); }
+footer { margin-top: 36px; font-size: 13px; color: var(--dim); }
+</style></head>
+<body><div class="wrap">
+  <span class="handle">@<b>ii_vedet</b></span>
+  <h1>ИИ решает твою задачу <span>за 60 секунд</span></h1>
+  <p class="lead">Напиши жизненное задание. Самое залайканное в TikTok станет следующим роликом, и ИИ решит его на глазах у всех.</p>
+
+  <form id="f" class="card" novalidate>
+    <div class="row"><label for="nick">Твой ник в TikTok</label><input id="nick" type="text" maxlength="60" placeholder="@твой_ник" autocomplete="off"></div>
+    <div class="row"><label for="rubric">Рубрика</label>
+      <select id="rubric"><option>Деньги</option><option>Работа</option><option>Быт</option><option>Путешествия</option><option>Сложный разговор</option></select></div>
+    <div class="row"><label for="task">Твоё задание для ИИ</label>
+      <textarea id="task" maxlength="600" placeholder="Например: составь меню на неделю из курицы, гречки и овощей на 800 грн"></textarea>
+      <div class="hint"><span>Чем конкретнее, тем лучше результат</span><span id="cnt">0/600</span></div></div>
+    <div class="row"><label class="check"><input id="show" type="checkbox" checked> Можно показать мой ник в ролике</label></div>
+    <div class="hp" aria-hidden="true"><label>Сайт <input id="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+    <button class="go" id="btn" type="submit">Отправить задание</button>
+    <div id="msg" role="status" aria-live="polite"></div>
+  </form>
+
+  <h2>Как это работает</h2>
+  <ol class="steps">
+    <li><span>Присылаешь задание через эту форму или в комментариях под роликом.</span></li>
+    <li><span>Самое залайканное задание выбираю для следующего ролика.</span></li>
+    <li><span>ИИ решает его за 60 секунд, а результат ты забираешь себе.</span></li>
+  </ol>
+
+  <h2>О чём задания</h2>
+  <div class="tags"><span>Деньги</span><span>Работа</span><span>Быт</span><span>Путешествия</span><span>Сложные разговоры</span></div>
+  <p class="rules" style="margin-top:14px">Не принимаю задания про реальных людей и знаменитостей, чужие бренды и персонажей, ремонт и стройку, а также обман и опасные вещи.</p>
+
+  <a class="tt" href="https://www.tiktok.com/@ii_vedet" target="_blank" rel="noopener">Смотреть @ii_vedet в TikTok →</a>
+  <footer>Ролики сделаны с помощью ИИ и отмечены в TikTok.</footer>
+</div>
+<script>
+(function () {
+  var f = document.getElementById('f'), btn = document.getElementById('btn'), msg = document.getElementById('msg'), task = document.getElementById('task'), cnt = document.getElementById('cnt');
+  task.addEventListener('input', function () { cnt.textContent = task.value.length + '/600'; });
+  function show(cls, text) { msg.className = 'msg ' + cls; msg.textContent = text; }
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (task.value.trim().length < 10) { show('err', 'Опиши задание подробнее: минимум 10 символов.'); return; }
+    btn.disabled = true; btn.textContent = 'Отправляю…'; msg.className = ''; msg.textContent = '';
+    var data = { nick: document.getElementById('nick').value, rubric: document.getElementById('rubric').value, task: task.value, showNick: document.getElementById('show').checked, website: document.getElementById('website').value };
+    function done(r) {
+      btn.disabled = false; btn.textContent = 'Отправить задание';
+      if (r && r.ok) { show('ok', 'Принято! Следи за роликами в TikTok: вдруг твоё задание выберут.'); f.reset(); cnt.textContent = '0/600'; }
+      else show('err', (r && r.error) || 'Не получилось отправить. Попробуй ещё раз.');
+    }
+    function fail() { done({ ok: false, error: 'Нет связи с сервером. Попробуй ещё раз через минуту.' }); }
+    if (window.google && google.script && google.script.run) google.script.run.withSuccessHandler(done).withFailureHandler(fail).submitTask(data);
+    else fail();
+  });
+})();
+</script></body></html>
