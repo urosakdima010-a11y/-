@@ -1,0 +1,526 @@
+<title>Город агентов 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Unbounded:wght@600;800&display=swap">
+<style>
+/* Layout: полноэкранная 3D-сцена; поверх неё панель статистики сверху слева, управление сверху справа, лента событий снизу слева, карточка выбранного агента снизу. */
+:root {
+  --panel: rgba(18, 13, 48, .82); --line: rgba(255,255,255,.16); --ink: #f4f1ff; --dim: #b7b0e2;
+  --accent: #ff5c8a; --accent2: #43e0ff; --ok: #3ddc84; --bg: #120c33;
+  --font-d: 'Unbounded', 'Manrope', system-ui, sans-serif; --font-b: 'Manrope', system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-b); overflow: hidden; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.ui { position: fixed; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(8px); }
+.hud { top: calc(12px + env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); padding: 12px 16px; max-width: min(340px, calc(100vw - 24px)); }
+.hud h1 { font: 800 18px var(--font-d); margin: 0 0 2px; letter-spacing: -.3px; }
+.hud .clock { font-size: 13px; color: var(--accent2); font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(3, auto); gap: 4px 16px; margin-top: 8px; font-size: 12px; color: var(--dim); }
+.stats b { display: block; font: 800 17px var(--font-d); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ctrl { top: calc(12px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); padding: 6px; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 200px; }
+.ctrl button { font: 800 13px var(--font-b); color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 8px 11px; cursor: pointer; }
+.ctrl button[aria-pressed="true"] { background: var(--accent); }
+.ctrl button:focus-visible { outline: 2px solid var(--accent2); }
+.feed { left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100vw - 24px)); padding: 10px 14px; max-height: 34vh; overflow: hidden; }
+.feed h2 { font: 600 11px var(--font-d); letter-spacing: 2px; text-transform: uppercase; color: var(--accent2); margin: 0 0 6px; }
+.feed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; line-height: 1.3; }
+.feed li span { color: var(--dim); font-size: 11px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.feed li.real { color: var(--accent); }
+.card { right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(330px, calc(100vw - 24px)); padding: 14px 16px; }
+.card h3 { font: 800 17px var(--font-d); margin: 2px 0 6px; }
+.card .where { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent2); }
+.card p { margin: 6px 0 0; font-size: 13px; line-height: 1.4; color: var(--dim); }
+.card p b { color: var(--ink); }
+.bar { height: 8px; border-radius: 8px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--ok)); }
+.close { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: var(--dim); font: 800 18px var(--font-b); cursor: pointer; }
+.tag { position: fixed; z-index: 3; transform: translate(-50%, -100%); pointer-events: none; font: 800 11px var(--font-b); white-space: nowrap; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.9); text-align: center; }
+.tag small { display: block; font-weight: 700; font-size: 10px; color: #ffe39a; }
+.tag.real small { color: var(--accent); }
+.toast { position: fixed; z-index: 8; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--accent); color: #fff; font: 800 14px var(--font-b); padding: 10px 18px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100vw - 32px); text-align: center; }
+.hint { font-size: 11px; color: var(--dim); margin-top: 8px; }
+@media (max-width: 640px) {
+  .hud { padding: 10px 12px; max-width: calc(100vw - 130px); } .hud h1 { font-size: 15px; }
+  .stats { grid-template-columns: repeat(3, auto); gap: 2px 10px; } .stats b { font-size: 14px; }
+  .ctrl { max-width: 110px; } .ctrl button { padding: 6px 8px; font-size: 12px; }
+  .feed { max-height: 22vh; font-size: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .card { left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  body.sel .feed { display: none; }
+  .hint { display: none; }
+}
+</style>
+
+<canvas id="c" aria-label="3D-город агентов"></canvas>
+<section class="ui hud">
+  <h1>Город агентов</h1>
+  <div class="clock" id="clock">День 1, 08:00</div>
+  <div class="stats">
+    <div><b id="sLvl">17</b>уровень города</div>
+    <div><b id="sTasks">0</b>задач</div>
+    <div><b id="sVid">0</b>роликов</div>
+  </div>
+  <div class="hint">Симуляция: агенты живут и растут сами, даже пока страница закрыта. Розовое кольцо значит, что агент сейчас работает по-настоящему.</div>
+</section>
+<nav class="ui ctrl" aria-label="Скорость времени">
+  <button type="button" data-sp="0">Пауза</button>
+  <button type="button" data-sp="1" aria-pressed="true">×1</button>
+  <button type="button" data-sp="4">×4</button>
+  <button type="button" data-sp="16">×16</button>
+</nav>
+<section class="ui feed" aria-live="polite"><h2>Жизнь города</h2><ul id="feed"></ul></section>
+<aside class="ui card" id="card" hidden></aside>
+<div id="tags"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+// ---------- данные агентов ----------
+const DIST = { c: 'Центральная площадь', t: 'Квартал @ii_vedet', v: 'Киностудия', b: 'Деловой район', l: 'Библиотека и приёмная' };
+const AG = [
+  { id: 'dir', d: 'c', n: 'Директор', h: 265, who: 'Раздаёт задачи всем агентам и принимает результат.' },
+  { id: 'prod', d: 't', n: 'Продюсер', h: 335, who: 'Ведёт ролик @ii_vedet от задания до публикации.' },
+  { id: 'scout', d: 't', n: 'Скаут', h: 190, who: 'Ищет задания зрителей и тренды.' },
+  { id: 'anal', d: 't', n: 'Аналитик', h: 205, who: 'Считает статистику и делает выводы.' },
+  { id: 'exec', d: 't', n: 'Исполнитель', h: 150, who: 'Решает задание зрителя по-настоящему.' },
+  { id: 'script', d: 't', n: 'Сценарист', h: 170, who: 'Раскладывает результат по сценам.' },
+  { id: 'mont', d: 't', n: 'Монтажёр', h: 20, who: 'Собирает ролик: озвучка, анимация, рендер.' },
+  { id: 'ctrl', d: 't', n: 'Контролёр', h: 0, who: 'Ищет ошибки в готовом ролике.' },
+  { id: 'comm', d: 't', n: 'Комьюнити', h: 305, who: 'Подпись, хэштеги, ответы на комментарии.' },
+  { id: 'tt', d: 't', n: 'TikTok-агент', h: 350, who: 'Ведёт TikTok целиком: идеи, план, статистика.' },
+  { id: 'vid', d: 'v', n: 'Монтаж видео', h: 30, who: 'Монтирует видео из ваших фото и клипов.' },
+  { id: 'vzero', d: 'v', n: 'Видео с нуля', h: 45, who: 'Делает видео без исходников.' },
+  { id: 'site', d: 'b', n: 'Сайт и бот', h: 200, who: 'Строит сайты и страницы с ИИ-чатом.' },
+  { id: 'smeta', d: 'b', n: 'Смета', h: 60, who: 'Считает сметы и расходы.' },
+  { id: 'docs', d: 'b', n: 'Документы', h: 240, who: 'Пишет письма, планы и отчёты.' },
+  { id: 'res', d: 'l', n: 'Исследования', h: 120, who: 'Разбирается в темах по многим источникам.' },
+  { id: 'sec', d: 'l', n: 'Секретарь', h: 280, who: 'Встречи, напоминания, будильники.' },
+];
+const PIPE = ['prod', 'scout', 'anal', 'exec', 'script', 'mont', 'ctrl', 'comm', 'prod'];
+const JOBS = {
+  tt: ['план публикаций', 'идеи роликов', 'разбор статистики'], vid: ['монтаж из фото', 'нарезка клипов'], vzero: ['анимация', 'озвучка ролика'],
+  site: ['лендинг', 'чат-бот для сайта'], smeta: ['смета на крышу', 'расчёт расходов'], docs: ['письмо', 'план на неделю', 'отчёт'],
+  res: ['сравнение вариантов', 'разбор темы'], sec: ['напоминание', 'встреча в календаре'],
+};
+
+// ---------- сохранение (только в этом браузере) ----------
+const KEY = 'agent-city-3d-v1';
+let save = null;
+try { save = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { save = null; }
+const st = { simTime: 8 * 60, tasks: 0, videos: 0, unlocked: [], agents: {} };
+if (save && save.v === 1) Object.assign(st, save.st);
+AG.forEach(a => { st.agents[a.id] = Object.assign({ lvl: 1, xp: 0 }, st.agents[a.id]); });
+const need = l => 2 + l * 2;
+function addXp(id, n, quiet) {
+  const s = st.agents[id];
+  s.xp += n;
+  let up = false;
+  while (s.xp >= need(s.lvl)) { s.xp -= need(s.lvl); s.lvl++; up = true; }
+  if (up && !quiet) log(`${byId[id].n} вырос до ${s.lvl} уровня, дом стал выше`);
+  return up;
+}
+
+// ---------- three.js сцена ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x120c33, 120, 240);
+const camera = new THREE.PerspectiveCamera(45, 1, .1, 400);
+camera.position.set(42, 44, 46);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(0, 0, 0); controls.enableDamping = true; controls.maxPolarAngle = 1.32; controls.minDistance = 14; controls.maxDistance = 120;
+const hemi = new THREE.HemisphereLight(0xcfe2ff, 0x2a2048, .7); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48, near: 1, far: 160 });
+scene.add(sun, sun.target);
+const moonL = new THREE.DirectionalLight(0x8090ff, .25); moonL.position.set(-30, 40, -20); scene.add(moonL);
+
+const std = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .85 }, o || {}));
+const ground = new THREE.Mesh(new THREE.CircleGeometry(80, 64), std(0x2f6e45)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const plaza = new THREE.Mesh(new THREE.CircleGeometry(13.5, 64), std(0xa99f8e)); plaza.rotation.x = -Math.PI / 2; plaza.position.y = .02; plaza.receiveShadow = true; scene.add(plaza);
+const road = new THREE.Mesh(new THREE.RingGeometry(14.8, 17.4, 96), std(0x2d2b3a)); road.rotation.x = -Math.PI / 2; road.position.y = .03; road.receiveShadow = true; scene.add(road);
+const dash = new THREE.Mesh(new THREE.RingGeometry(16.02, 16.18, 96), std(0xf2e6b0)); dash.rotation.x = -Math.PI / 2; dash.position.y = .04; scene.add(dash);
+
+// окна: текстуры для фасадов
+function winTex(seed, emis) {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 32; const g = cv.getContext('2d');
+  g.fillStyle = emis ? '#000' : '#fff'; g.fillRect(0, 0, 64, 32);
+  let s = seed;
+  for (let i = 0; i < 4; i++) {
+    s = (s * 9301 + 49297) % 233280; const lit = s / 233280 > .35;
+    g.fillStyle = emis ? (lit ? '#fff' : '#000') : '#2b3150';
+    g.fillRect(4 + i * 15, 9, 10, 15);
+  }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+const winVariants = [1, 2, 3, 4, 5].map(s => ({ map: winTex(s * 97, false), em: winTex(s * 97, true) }));
+
+// размещение домов: по кругу, районы через промежутки
+const slots = []; let k = 0;
+['t', 'v', 'b', 'l'].forEach(d => { AG.filter(a => a.d === d).forEach(a => { slots.push([a.id, k++]); }); k++; });
+const SLOT_N = k, R_B = 23;
+const byId = {};
+const pickables = [];
+const facades = [];
+AG.forEach(a => {
+  byId[a.id] = a;
+  if (a.id === 'dir') { a.ang = 0; a.home = new THREE.Vector3(0, 0, 0); a.door = new THREE.Vector3(0, 0, 5.4); a.bx = new THREE.Vector3(0, 0, 0); a.size = 7; }
+  else {
+    const idx = slots.find(s => s[0] === a.id)[1];
+    a.ang = idx / SLOT_N * Math.PI * 2;
+    a.bx = new THREE.Vector3(Math.sin(a.ang) * R_B, 0, Math.cos(a.ang) * R_B);
+    a.door = new THREE.Vector3(Math.sin(a.ang) * (R_B - 3.2), 0, Math.cos(a.ang) * (R_B - 3.2));
+    a.size = 4.4;
+    const sp = new THREE.Mesh(new THREE.PlaneGeometry(1.6, R_B - 3.2 - 17.4 + .4), std(0x2d2b3a));
+    sp.rotation.x = -Math.PI / 2; sp.rotation.z = a.ang;
+    const mid = (17.2 + R_B - 3.2) / 2; sp.position.set(Math.sin(a.ang) * mid, .03, Math.cos(a.ang) * mid); sp.receiveShadow = true; scene.add(sp);
+  }
+  a.color = new THREE.Color().setHSL(a.h / 360, .5, .55);
+  // дом
+  const g = new THREE.Group(); g.position.copy(a.bx); g.rotation.y = a.ang; scene.add(g); a.house = g;
+  const v = winVariants[(a.h + a.n.length) % winVariants.length];
+  const side = std(a.color.clone().lerp(new THREE.Color(0xffffff), .25), { map: v.map, emissive: 0xffd27a, emissiveMap: v.em, emissiveIntensity: 0 });
+  const top = std(a.color.clone().multiplyScalar(.7));
+  facades.push(side);
+  a.floors = []; a.floorMat = [side, side, top, top, side, side];
+  a.roof = new THREE.Mesh(new THREE.BoxGeometry(a.size + .5, .35, a.size + .5), std(a.color.clone().multiplyScalar(.55)));
+  a.roof.castShadow = true; g.add(a.roof);
+  a.flagH = 0; a.targetFloors = 0;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.5, .1), std(0x2a1c10)); door.position.set(0, .75, a.size / 2 + .02); g.add(door);
+  if (a.id === 'dir') {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, 4, 6), std(0xdddddd)); a.ant = ant; g.add(ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(.35, 12, 8), std(0xff5c8a, { emissive: 0xff5c8a, emissiveIntensity: 1 })); a.tip = tip; g.add(tip);
+  }
+});
+const FLOOR_H = 1.35;
+function syncFloors(a, instant) {
+  const want = Math.min(16, (a.id === 'dir' ? 4 : 1) + st.agents[a.id].lvl);
+  while (a.floors.length < want) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(a.size, FLOOR_H, a.size), a.floorMat);
+    m.castShadow = true; m.receiveShadow = true; m.userData.id = a.id;
+    m.position.y = a.floors.length * FLOOR_H + FLOOR_H / 2;
+    m.scale.y = instant ? 1 : .01; a.house.add(m); a.floors.push(m); pickables.push(m);
+  }
+}
+AG.forEach(a => syncFloors(a, true));
+
+// ---------- жители ----------
+const skin = std(0xffd7b8), eyeM = std(0x111111), boxM = std(0xffc84a, { emissive: 0x553300 });
+AG.forEach(a => {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.42, .5, 1.1, 14), std(a.color)); body.position.y = .75; body.castShadow = true;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.4, 16, 12), skin); head.position.y = 1.62; head.castShadow = true;
+  const e1 = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 6), eyeM); e1.position.set(-.14, 1.68, .36);
+  const e2 = e1.clone(); e2.position.x = .14;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(.42, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), std(a.color.clone().multiplyScalar(.45))); hair.position.y = 1.66;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(.5, .5, .5), boxM); box.position.set(0, .9, .62); box.visible = false;
+  const halo = new THREE.Mesh(new THREE.RingGeometry(.8, 1.05, 32), new THREE.MeshBasicMaterial({ color: 0xff5c8a, transparent: true, opacity: .9, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = .06; halo.visible = false;
+  [body, head].forEach(m => { m.userData.id = a.id; pickables.push(m); });
+  g.add(body, head, e1, e2, hair, box, halo); g.scale.setScalar(1.25);
+  g.position.copy(a.door); scene.add(g);
+  a.mesh = g; a.box = box; a.halo = halo; a.queue = []; a.act = null; a.say = 'дома'; a.wait = 2 + Math.random() * 6;
+  const tag = document.createElement('div'); tag.className = 'tag'; document.getElementById('tags').appendChild(tag); a.tag = tag;
+});
+
+// ---------- маршруты по дорогам ----------
+const RING = 16;
+const polar = (r, ang) => new THREE.Vector3(Math.sin(ang) * r, 0, Math.cos(ang) * r);
+function route(from, to) {
+  const pts = [];
+  const fa = from.id === 'dir' ? null : from.ang, ta = to.id === 'dir' ? null : to.ang;
+  if (fa === null && ta === null) return [to.door.clone()];
+  if (fa === null) { pts.push(polar(6, ta), polar(RING, ta), to.door.clone()); return pts; }
+  pts.push(polar(RING, fa));
+  if (ta === null) { pts.push(polar(6, fa), to.door.clone()); return pts; }
+  let d = ta - fa; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+  const n = Math.max(1, Math.ceil(Math.abs(d) / .2));
+  for (let i = 1; i <= n; i++) pts.push(polar(RING, fa + d * i / n));
+  pts.push(to.door.clone()); return pts;
+}
+// где сейчас агент: дома, у директора или у кого-то
+function go(a, toId, opt) { a.queue.push(Object.assign({ t: 'go', to: toId }, opt || {})); }
+function wait(a, sec, say, fn) { a.queue.push({ t: 'wait', sec, say, fn }); }
+function work(a, sec, say, fn) { a.queue.push({ t: 'work', sec, say, fn }); }
+
+// цепочка ролика @ii_vedet
+let pipeBusy = false;
+function startVideo() {
+  pipeBusy = true; const p = byId.prod;
+  go(p, 'dir', { say: 'идёт за заданием' });
+  wait(p, 1.5, 'берёт задание из комментариев', () => log('Продюсер взял задание зрителя у Директора'));
+  go(p, 'prod', { say: 'несёт задание домой', carry: true });
+  passOn(0);
+}
+function passOn(i) {
+  const fromId = PIPE[i], toId = PIPE[i + 1], from = byId[fromId], to = byId[toId];
+  if (!to) return;
+  go(from, toId, { say: 'несёт работу: ' + to.n, carry: true });
+  wait(from, .8, 'передаёт', () => {
+    if (toId === 'prod') {
+      st.videos++; st.tasks++; addXp('prod', 2);
+      log(`Ролик готов! Всего роликов: ${st.videos}`);
+      go(from, fromId, { say: 'домой' });
+      work(byId.prod, 4, 'публикует ролик', () => { pipeBusy = false; });
+      return;
+    }
+    log(`${from.n} передал работу: ${to.n}`);
+    go(from, fromId, { say: 'домой' });
+    go(to, toId, { say: 'спешит к себе' });
+    work(to, 6 + Math.random() * 6, ({ scout: 'ищет задания', anal: 'считает статистику', exec: 'решает задание', script: 'пишет сценарий', mont: 'монтирует', ctrl: 'проверяет кадры', comm: 'пишет подпись' })[toId] || 'работает', () => { st.tasks++; addXp(toId, 1); passOn(i + 1); });
+  });
+}
+function soloJob(a) {
+  const job = (JOBS[a.id] || ['задача'])[Math.floor(Math.random() * (JOBS[a.id] || [1]).length)];
+  go(a, 'dir', { say: 'идёт за задачей' });
+  wait(a, 1.2, 'получает: ' + job);
+  go(a, a.id, { say: 'идёт работать' });
+  work(a, 8 + Math.random() * 10, job);
+  go(a, 'dir', { say: 'несёт результат', carry: true });
+  wait(a, 1, 'сдаёт работу', () => { st.tasks++; addXp(a.id, 1); addXp('dir', .5, true); log(`${a.n} сдал: ${job}`); });
+  go(a, a.id, { say: 'домой' });
+}
+
+// ---------- шаг агента ----------
+const SPEED = 4.2;
+function stepAgent(a, dt) {
+  if (!a.act) {
+    a.act = a.queue.shift() || null;
+    if (a.act && a.act.t === 'go') { a.path = route(a.loc || a, byId[a.act.to]); a.box.visible = !!a.act.carry; }
+    if (a.act && a.act.say) a.say = a.act.say;
+    if (!a.act) {
+      a.box.visible = false; a.say = a.id === 'dir' ? 'раздаёт задачи' : 'отдыхает';
+      a.wait -= dt;
+      if (a.wait <= 0) {
+        a.wait = 3 + Math.random() * 10;
+        if (a.id === 'prod' && !pipeBusy) startVideo();
+        else if (JOBS[a.id] && Math.random() < .6) soloJob(a);
+      }
+      return;
+    }
+  }
+  const m = a.mesh;
+  if (a.act.t === 'go') {
+    let left = SPEED * dt;
+    while (left > 0 && a.path.length) {
+      const p = a.path[0], dx = p.x - m.position.x, dz = p.z - m.position.z, dist = Math.hypot(dx, dz);
+      if (dist < 1e-3) { a.path.shift(); continue; }
+      const s = Math.min(dist, left);
+      m.position.x += dx / dist * s; m.position.z += dz / dist * s; left -= s;
+      m.rotation.y = Math.atan2(dx, dz);
+      if (s === dist) a.path.shift();
+    }
+    a.walkT = (a.walkT || 0) + dt * 10; m.position.y = Math.abs(Math.sin(a.walkT)) * .18;
+    if (!a.path.length) { a.loc = byId[a.act.to]; m.position.y = 0; a.act = null; }
+  } else {
+    a.act.sec -= dt; m.position.y = 0;
+    if (a.act.t === 'work') { m.rotation.y += dt * .6; a.progress = 1 - Math.max(0, a.act.sec) / (a.act.total || (a.act.total = a.act.sec + dt)); }
+    if (a.act.sec <= 0) { const f = a.act.fn; a.act = null; a.progress = 0; if (f) f(); }
+  }
+}
+
+// ---------- декор, который открывается с ростом города ----------
+const UNLOCKS = [
+  [22, 'trees', 'В городе посадили деревья'],
+  [28, 'lamps', 'Вдоль дороги зажглись фонари'],
+  [35, 'fountain', 'На площади открылся фонтан'],
+  [44, 'billboard', 'Появился билборд @ii_vedet'],
+  [55, 'balloon', 'Над городом летает воздушный шар'],
+  [70, 'park', 'Разбили парк с лавочками'],
+];
+const lampBulbs = []; let balloon = null, waterM = null;
+function build(kind) {
+  if (kind === 'trees') {
+    for (let i = 0; i < 40; i++) {
+      const r = i < 14 ? 10.5 + Math.random() * 2.2 : 29 + Math.random() * 10, ang = Math.random() * Math.PI * 2;
+      if (i >= 14 && AG.some(a => a.id !== 'dir' && Math.abs(((a.ang - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < .12)) continue;
+      const t = new THREE.Group();
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(.18, .24, 1.2, 6), std(0x6b4423)); tr.position.y = .6;
+      const cr = new THREE.Mesh(new THREE.ConeGeometry(1 + Math.random() * .4, 2.4, 8), std(0x2f7d4a)); cr.position.y = 2.2;
+      tr.castShadow = cr.castShadow = true; t.add(tr, cr); t.position.copy(polar(r, ang)); scene.add(t);
+    }
+  } else if (kind === 'lamps') {
+    for (let i = 0; i < 16; i++) {
+      const ang = (i + .5) / 16 * Math.PI * 2, p = polar(18, ang);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.07, .09, 3, 6), std(0x333344)); pole.position.set(p.x, 1.5, p.z);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(.28, 10, 8), std(0xfff2c0, { emissive: 0xffd27a, emissiveIntensity: 0 })); b.position.set(p.x, 3.1, p.z);
+      scene.add(pole, b); lampBulbs.push(b.material);
+    }
+  } else if (kind === 'fountain') {
+    const p = polar(10, Math.PI);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.2, .6, 24), std(0xbfb6a8)); bowl.position.set(p.x, .3, p.z);
+    waterM = std(0x5ac8ff, { emissive: 0x1a6aa0, emissiveIntensity: .4, roughness: .2 });
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, .1, 24), waterM); w.position.set(p.x, .62, p.z);
+    const jet = new THREE.Mesh(new THREE.CylinderGeometry(.12, .25, 2, 8), std(0xbfe9ff, { transparent: true, opacity: .7 })); jet.position.set(p.x, 1.6, p.z); jet.userData.jet = true;
+    scene.add(bowl, w, jet); fountainJet = jet;
+  } else if (kind === 'billboard') {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256; const g = cv.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 512, 256); gr.addColorStop(0, '#2a1b6b'); gr.addColorStop(1, '#ff4878'); g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = '#fff'; g.font = '800 64px Manrope, sans-serif'; g.fillText('@ii_vedet', 40, 120); g.font = '700 36px Manrope, sans-serif'; g.fillStyle = '#3CDCFF'; g.fillText('ИИ ведёт 🤖', 40, 190);
+    const tex = new THREE.CanvasTexture(cv);
+    const ang = byId.mont.ang + .2, p = polar(33, ang);
+    const bb = new THREE.Group();
+    const sc = new THREE.Mesh(new THREE.PlaneGeometry(9, 4.5), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    sc.position.y = 6; const l1 = new THREE.Mesh(new THREE.BoxGeometry(.3, 4, .3), std(0x333344)); l1.position.set(-3, 2, 0); const l2 = l1.clone(); l2.position.x = 3;
+    bb.add(sc, l1, l2); bb.position.copy(p); bb.lookAt(0, 0, 0); scene.add(bb);
+  } else if (kind === 'balloon') {
+    balloon = new THREE.Group();
+    const env = new THREE.Mesh(new THREE.SphereGeometry(2.2, 20, 16), std(0xff5c8a, { roughness: .5 })); env.scale.y = 1.2;
+    const bk = new THREE.Mesh(new THREE.BoxGeometry(1, .8, 1), std(0x8a5a2b)); bk.position.y = -3.4;
+    balloon.add(env, bk); scene.add(balloon);
+  } else if (kind === 'park') {
+    for (let i = 0; i < 8; i++) {
+      const ang = i / 8 * Math.PI * 2 + .3, p = polar(8.2, ang);
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(2, .25, .7), std(0x9a6a3a)); bench.position.set(p.x, .55, p.z); bench.rotation.y = ang; bench.castShadow = true;
+      const fl = new THREE.Mesh(new THREE.CircleGeometry(1.2, 16), std(0xff8fb1)); fl.rotation.x = -Math.PI / 2; const q = polar(11.8, ang + .4); fl.position.set(q.x, .05, q.z);
+      scene.add(bench, fl);
+    }
+  }
+}
+let fountainJet = null;
+const cityLevel = () => AG.reduce((s, a) => s + st.agents[a.id].lvl, 0);
+function checkUnlocks(quiet) {
+  const L = cityLevel();
+  UNLOCKS.forEach(([lv, kind, msg]) => {
+    if (L >= lv && !st.unlocked.includes(kind)) { st.unlocked.push(kind); if (!quiet) log(msg); }
+  });
+}
+
+// ---------- офлайн-прогресс ----------
+let toastMsg = '';
+if (save && save.savedAt) {
+  const away = Math.min(8 * 3600, Math.max(0, (Date.now() - save.savedAt) / 1000));
+  const jobs = Math.floor(away / 45);
+  if (jobs > 0) {
+    const ids = AG.map(a => a.id);
+    for (let i = 0; i < jobs; i++) addXp(ids[Math.floor(Math.random() * ids.length)], 1, true);
+    const vids = Math.floor(jobs / 14);
+    st.tasks += jobs; st.videos += vids; st.simTime += away;
+    toastMsg = `Пока вас не было: ${jobs} задач, ${vids} роликов`;
+  }
+}
+checkUnlocks(true); st.unlocked.forEach(build);
+AG.forEach(a => syncFloors(a, true));
+
+// ---------- лента и интерфейс ----------
+const feedEl = document.getElementById('feed'); const events = [];
+const clockStr = t => { const d = Math.floor(t / 1440) + 1, m = Math.floor(t % 1440); return `День ${d}, ${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+function log(msg, real) {
+  events.unshift({ msg, real, time: clockStr(st.simTime).split(', ')[1] });
+  events.length = Math.min(events.length, 7);
+  feedEl.innerHTML = events.map(e => `<li class="${e.real ? 'real' : ''}"><span>${e.time}</span>${e.msg.replace(/</g, '&lt;')}</li>`).join('');
+}
+log(toastMsg || 'Город проснулся. Агенты выходят на работу');
+if (toastMsg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = toastMsg; document.body.appendChild(t); setTimeout(() => t.remove(), 5000); }
+
+let speed = 1;
+document.querySelectorAll('.ctrl button').forEach(b => b.addEventListener('click', () => {
+  speed = +b.dataset.sp; document.querySelectorAll('.ctrl button').forEach(x => x.setAttribute('aria-pressed', x === b));
+}));
+
+// ---------- реальные статусы из базы ----------
+const real = {};
+(async () => {
+  try {
+    const db = await claude.use('db'); if (!db) return;
+    db.collection('status').onSnapshot(snap => {
+      snap.docs.forEach(d => {
+        const x = d.data(); if (!x || !byId[d.id]) return;
+        const prev = real[d.id];
+        real[d.id] = { state: String(x.state), task: String(x.task || '') };
+        if (x.state === 'working' && (!prev || prev.task !== real[d.id].task)) log(`${byId[d.id].n} по-настоящему работает: ${real[d.id].task}`, true);
+      });
+      Object.keys(real).forEach(id => { if (!snap.docs.some(d => d.id === id)) delete real[id]; });
+    }, () => {});
+  } catch (e) { /* без базы город живёт только в симуляции */ }
+})();
+
+// ---------- выбор агента ----------
+const card = document.getElementById('card'); let selected = null;
+function renderCard() {
+  if (!selected) { card.hidden = true; document.body.classList.remove('sel'); return; }
+  const a = selected, s = st.agents[a.id], r = real[a.id];
+  card.hidden = false; document.body.classList.add('sel');
+  card.innerHTML = `<button class="close" type="button" aria-label="Закрыть">×</button><div class="where">${DIST[a.d]}</div><h3>${a.n}</h3>
+    <p>${a.who}</p><p><b>Уровень ${s.lvl}</b>, этажей: ${a.floors.length}. Сейчас: ${a.say}${a.progress ? ` (${Math.round(a.progress * 100)}%)` : ''}.</p>
+    <div class="bar"><i style="width:${Math.round(s.xp / need(s.lvl) * 100)}%"></i></div>
+    ${r && r.state === 'working' ? `<p><b style="color:var(--accent)">По-настоящему работает:</b> ${r.task.replace(/</g, '&lt;')}</p>` : ''}`;
+  card.querySelector('.close').onclick = () => { selected = null; renderCard(); };
+}
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  ptr.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObjects(pickables, false)[0];
+  selected = hit ? byId[hit.object.userData.id] : null; renderCard();
+});
+
+// ---------- день и ночь ----------
+const cDay = new THREE.Color(0x8fd0ff), cDusk = new THREE.Color(0xff9a8b), cNight = new THREE.Color(0x120c33), sky = new THREE.Color();
+function lighting() {
+  const m = st.simTime % 1440 / 1440;
+  const sunH = Math.sin((m - .25) * Math.PI * 2);
+  const day = THREE.MathUtils.clamp(sunH * 2 + .3, 0, 1), dusk = THREE.MathUtils.clamp(1 - Math.abs(sunH) * 4, 0, 1);
+  sky.copy(cNight).lerp(cDay, day); sky.lerp(cDusk, dusk * .45);
+  scene.background = sky; scene.fog.color.copy(sky);
+  const a = (m - .25) * Math.PI * 2;
+  sun.position.set(Math.cos(a) * 60, Math.max(8, Math.sin(a) * 70), 25); sun.intensity = .15 + day * .95;
+  hemi.intensity = .3 + day * .5;
+  const night = 1 - day;
+  facades.forEach(f => f.emissiveIntensity = night * 1.1);
+  lampBulbs.forEach(b => b.emissiveIntensity = night * 2);
+  return night;
+}
+
+// ---------- цикл ----------
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+const v3 = new THREE.Vector3();
+let last = performance.now(), saveT = 0, cardT = 0;
+function loop(now) {
+  const rdt = Math.min(.1, (now - last) / 1000); last = now;
+  const dt = rdt * speed;
+  st.simTime += dt * 1; // 1 секунда = 1 минута города
+  AG.forEach(a => stepAgent(a, dt));
+  checkUnlocks(false); st.unlocked.forEach(k => { if (!build.done) build.done = {}; if (!build.done[k]) { build.done[k] = 1; if (!initialBuilt.has(k)) build(k); } });
+  AG.forEach(a => {
+    syncFloors(a);
+    a.floors.forEach(f => { if (f.scale.y < 1) f.scale.y = Math.min(1, f.scale.y + rdt * 1.5); });
+    const top = a.floors.length * FLOOR_H; a.roof.position.y += (top + .17 - a.roof.position.y) * Math.min(1, rdt * 4);
+    if (a.ant) { a.ant.position.y = a.roof.position.y + 2; a.tip.position.y = a.roof.position.y + 4.1; }
+    const r = real[a.id]; a.halo.visible = !!(r && r.state === 'working'); if (a.halo.visible) a.halo.material.opacity = .55 + Math.sin(now / 200) * .35;
+  });
+  const night = lighting();
+  if (balloon) { const t = now / 1000 * .05 * Math.max(speed, .2); balloon.position.set(Math.sin(t) * 30, 26 + Math.sin(t * 3) * 2, Math.cos(t) * 30); }
+  if (fountainJet) fountainJet.scale.y = 1 + Math.sin(now / 150) * .15;
+  controls.update(); renderer.render(scene, camera);
+  // подписи над жителями
+  const w = innerWidth, h = innerHeight;
+  AG.forEach(a => {
+    v3.copy(a.mesh.position); v3.y += 3; v3.project(camera);
+    const vis = v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1;
+    a.tag.hidden = !vis; if (!vis) return;
+    a.tag.style.left = (v3.x + 1) / 2 * w + 'px'; a.tag.style.top = (1 - v3.y) / 2 * h + 'px';
+    const r = real[a.id], isReal = r && r.state === 'working';
+    const sub = isReal ? r.task : (a.act && a.act.t === 'work' ? a.say : '');
+    a.tag.className = 'tag' + (isReal ? ' real' : '');
+    const html = a.n + (sub ? `<small>${sub.replace(/</g, '&lt;')}</small>` : '');
+    if (a.tag._h !== html) { a.tag.innerHTML = html; a.tag._h = html; }
+  });
+  document.getElementById('clock').textContent = clockStr(st.simTime) + (night > .6 ? ' · ночь' : '');
+  document.getElementById('sLvl').textContent = cityLevel();
+  document.getElementById('sTasks').textContent = st.tasks;
+  document.getElementById('sVid').textContent = st.videos;
+  cardT += rdt; if (cardT > .5 && selected) { cardT = 0; renderCard(); }
+  saveT += rdt; if (saveT > 5) { saveT = 0; try { localStorage.setItem(KEY, JSON.stringify({ v: 1, st, savedAt: Date.now() })); } catch (e) {} }
+  requestAnimationFrame(loop);
+}
+const initialBuilt = new Set(st.unlocked);
+requestAnimationFrame(loop);
+})();
+</script>
