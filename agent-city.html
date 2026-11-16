@@ -1,0 +1,196 @@
+<title>Город агентов</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Unbounded:wght@600;800&display=swap">
+<style>
+/* Layout: ночной город с районами; в каждом районе ряд домов на земле и улица с прохожими. Снизу карточка выбранного жителя. */
+:root {
+  --sky1: #1a1446; --sky2: #3a2a78; --ground: #0f0b2b; --road: #1c1640;
+  --ink: #f3f0ff; --dim: #b4aedd; --panel: #1d1650; --line: rgba(255,255,255,.16);
+  --accent: #ff5c8a; --accent2: #43e0ff; --win-on: #ffd98a; --win-off: rgba(255,255,255,.08);
+  --bl: 30%; --orb: #fff1c9; --star: 1; --font-d: 'Unbounded', 'Manrope', system-ui, sans-serif; --font-b: 'Manrope', system-ui, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --sky1: #8fd3ff; --sky2: #ffe3c4; --ground: #5c6f8f; --road: #46546f;
+  --ink: #17143a; --dim: #4a4678; --panel: #ffffff; --line: rgba(23,20,58,.18);
+  --accent: #d6245c; --accent2: #0a7fa6; --win-on: #fff6cf; --win-off: rgba(255,255,255,.22);
+  --bl: 44%; --orb: #ffd54a; --star: 0; color-scheme: light; } }
+:root[data-theme="light"] {
+  --sky1: #8fd3ff; --sky2: #ffe3c4; --ground: #5c6f8f; --road: #46546f;
+  --ink: #17143a; --dim: #4a4678; --panel: #ffffff; --line: rgba(23,20,58,.18);
+  --accent: #d6245c; --accent2: #0a7fa6; --win-on: #fff6cf; --win-off: rgba(255,255,255,.22);
+  --bl: 44%; --orb: #ffd54a; --star: 0; color-scheme: light; }
+:root[data-theme="dark"] {
+  --sky1: #1a1446; --sky2: #3a2a78; --ground: #0f0b2b; --road: #1c1640;
+  --ink: #f3f0ff; --dim: #b4aedd; --panel: #1d1650; --line: rgba(255,255,255,.16);
+  --accent: #ff5c8a; --accent2: #43e0ff; --win-on: #ffd98a; --win-off: rgba(255,255,255,.08);
+  --bl: 30%; --orb: #fff1c9; --star: 1; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-b); color: var(--ink); background: linear-gradient(var(--sky1), var(--sky2) 55%, var(--ground)); min-height: 100vh;
+  padding-block: 20px 250px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); position: relative; overflow-x: hidden; }
+.stars { position: absolute; inset: 0 0 auto; height: 360px; opacity: var(--star); pointer-events: none;
+  background-image: radial-gradient(1.5px 1.5px at 12% 20%, #fff, transparent), radial-gradient(1.5px 1.5px at 33% 8%, #fff, transparent), radial-gradient(2px 2px at 57% 28%, #fff, transparent), radial-gradient(1.5px 1.5px at 78% 12%, #fff, transparent), radial-gradient(1.5px 1.5px at 90% 34%, #fff, transparent), radial-gradient(1.5px 1.5px at 22% 40%, #fff, transparent); }
+.wrap { max-width: 1040px; margin: 0 auto; position: relative; }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+h1 { font: 800 clamp(28px, 6vw, 46px)/1.05 var(--font-d); margin: 0; letter-spacing: -1px; text-wrap: balance; }
+.sub { margin: 10px 0 0; color: var(--dim); font-size: 16px; max-width: 46ch; }
+.orb { position: absolute; right: 8px; top: 64px; width: 74px; height: 74px; border-radius: 50%; background: var(--orb); box-shadow: 0 0 60px 14px color-mix(in srgb, var(--orb) 45%, transparent); opacity: .9; pointer-events: none; }
+.toggle { font: 700 14px var(--font-b); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 10px 18px; cursor: pointer; position: relative; z-index: 2; }
+.district { margin-top: 34px; }
+.dname { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.dname h2 { font: 600 13px var(--font-d); letter-spacing: 2px; text-transform: uppercase; margin: 0; color: var(--accent2); }
+.dname span { font-size: 14px; color: var(--dim); }
+.skyline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 12px; padding-inline: 4px; }
+.bld { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 104px; position: relative; }
+.bld:focus-visible .body { outline: 3px solid var(--accent2); outline-offset: 3px; }
+.body { width: 100%; border-radius: 8px 8px 0 0; background: linear-gradient(hsl(var(--h) 40% calc(var(--bl) + 8%)), hsl(var(--h) 40% var(--bl))); position: relative; padding: 14px 10px 8px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-content: start; transition: transform .2s, box-shadow .2s; box-shadow: 0 0 0 1px rgba(255,255,255,.1) inset; }
+.body:before { content: ''; position: absolute; left: 50%; top: -14px; width: 4px; height: 14px; background: hsl(var(--h) 40% calc(var(--bl) + 12%)); transform: translateX(-50%); }
+.bld:hover .body { transform: translateY(-5px); }
+.bld[aria-pressed="true"] .body { box-shadow: 0 0 0 3px var(--accent), 0 0 34px color-mix(in srgb, var(--accent) 60%, transparent); transform: translateY(-8px); }
+.w { aspect-ratio: 1; border-radius: 2px; background: var(--win-off); }
+.w.on { background: var(--win-on); box-shadow: 0 0 8px color-mix(in srgb, var(--win-on) 70%, transparent); }
+.st { position: absolute; top: -26px; right: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--dim); border: 2px solid var(--panel); opacity: .6; z-index: 3; }
+.bld[data-state="working"] .st { background: var(--accent); opacity: 1; animation: ping 1.2s ease-in-out infinite; }
+.bld[data-state="done"] .st { background: #3ddc84; opacity: 1; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 var(--accent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+.bub { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: max-content; max-width: 150px; font: 700 11.5px/1.25 var(--font-b); color: var(--ink); background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 6px 10px; z-index: 4; pointer-events: none; text-align: center; }
+.bld[data-state="working"] .body { box-shadow: 0 0 0 2px var(--accent) inset; }
+.bld[data-state="working"] .w.on:nth-child(odd) { animation: blink 1.6s steps(2) infinite; }
+@keyframes blink { 50% { background: var(--win-off); box-shadow: none; } }
+.feed { margin: 0 0 6px; padding: 14px 16px; background: color-mix(in srgb, var(--panel) 80%, transparent); border: 1px solid var(--line); border-radius: 16px; max-width: 640px; }
+.feed h2 { font: 600 12px var(--font-d); letter-spacing: 2px; text-transform: uppercase; color: var(--accent2); margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
+.feed h2 i { width: 9px; height: 9px; border-radius: 50%; background: #3ddc84; }
+.feed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.feed li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.feed li b { font-weight: 800; }
+.feed li em { font-style: normal; color: var(--dim); }
+.feed li time { margin-left: auto; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.feed .empty { color: var(--dim); }
+.door { grid-column: 2; height: 22px; background: hsl(var(--h) 40% calc(var(--bl) - 12%)); border-radius: 10px 10px 0 0; align-self: end; }
+.lab { font: 700 12.5px/1.2 var(--font-b); text-align: center; color: var(--ink); text-wrap: balance; min-height: 3em; }
+.road { position: relative; height: 40px; margin-top: 0; background: var(--road); border-top: 4px solid color-mix(in srgb, var(--ground) 70%, #000); overflow: hidden; border-radius: 0 0 10px 10px; }
+.road:after { content: ''; position: absolute; left: 0; right: 0; top: 19px; height: 3px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.5) 0 22px, transparent 22px 44px); }
+.p { position: absolute; bottom: 14px; left: 0; width: 10px; height: 22px; animation: walk var(--t) linear infinite alternate; animation-delay: var(--d); z-index: 1; }
+.p:before { content: ''; position: absolute; left: 1px; top: 0; width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--h) 80% 70%); }
+.p:after { content: ''; position: absolute; left: 3px; top: 8px; width: 4px; height: 14px; border-radius: 3px; background: hsl(var(--h) 70% 60%); }
+.car { position: absolute; bottom: 6px; left: 0; width: 46px; height: 18px; border-radius: 7px 12px 4px 4px; background: hsl(var(--h) 80% 60%); animation: drive var(--t) linear infinite; animation-delay: var(--d); z-index: 2; }
+.car:before { content: ''; position: absolute; right: 7px; top: 3px; width: 14px; height: 7px; background: rgba(255,255,255,.6); border-radius: 3px; }
+@keyframes walk { to { left: calc(100% - 10px); } }
+@keyframes drive { from { left: -60px; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .p, .car { animation: none; left: 30%; } .bld .body { transition: none; } }
+.card { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 14px max(16px, env(safe-area-inset-left, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -20px 50px rgba(0,0,0,.28); }
+.card .in { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 6px; }
+.card h3 { font: 800 20px var(--font-d); margin: 0; letter-spacing: -.5px; }
+.card .where { font-size: 13px; color: var(--accent2); font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.card p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--dim); max-width: 70ch; }
+.card p b { color: var(--ink); }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.tags span { font: 700 12.5px var(--font-b); padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); }
+@media (min-width: 760px) { .card .in { grid-template-columns: 1fr 1fr; column-gap: 40px; } .card .l { grid-column: 1; } .card .r { grid-column: 2; } .bld { width: 120px; } }
+</style>
+
+<div class="stars"></div>
+<div class="wrap">
+  <div class="orb"></div>
+  <header>
+    <div>
+      <h1>Город агентов</h1>
+      <p class="sub">Здесь живёт ваша команда. Нажмите на дом, чтобы узнать, чем занимается агент и когда его звать.</p>
+    </div>
+    <button class="toggle" id="tg" type="button">День / ночь</button>
+  </header>
+  <section class="feed" aria-live="polite"><h2><i></i>Сейчас в городе</h2><ul id="feed"><li class="empty">Загружаю…</li></ul></section>
+  <main id="city"></main>
+</div>
+
+<aside class="card" aria-live="polite"><div class="in" id="card"></div></aside>
+
+<script>
+const DISTRICTS = [
+  { id: 'c', name: 'Центральная площадь', note: 'Здесь принимают задачи', a: [
+    { id: 'dir', n: 'Директор офиса', h: 265, rows: 5, who: 'Принимает любую задачу одной фразой, раздаёт её нужным агентам и отдаёт готовый результат.', when: 'Когда не знаете, к кому идти. Говорите задачу, остальное он решит сам.', tools: ['список задач', 'параллельные агенты', 'проверка итога'] } ] },
+  { id: 't', name: 'Квартал @ii_vedet', note: 'Всё для TikTok-аккаунта «ИИ ведёт»', a: [
+    { id: 'prod', n: 'Продюсер @ii_vedet', h: 335, rows: 5, who: 'Главный в квартале. Собирает команду, выбирает задание и отвечает за готовый ролик.', when: 'Любой ролик для @ii_vedet: от задания зрителя до подписи и плана публикации.', tools: ['команда помощников', 'публикует только после «да»'] },
+    { id: 'scout', n: 'Скаут', h: 190, rows: 3, who: 'Читает комментарии, находит задания зрителей и тренды русскоязычного TikTok про ИИ.', when: 'В начале каждого ролика.', tools: ['vidIQ', 'поиск в сети'] },
+    { id: 'anal', n: 'Аналитик', h: 205, rows: 3, who: 'Считает просмотры, досмотры, лайки и подписчиков, делает три вывода: что сработало, что нет.', when: 'Перед выбором темы и после выхода ролика.', tools: ['Windsor.ai', 'статистика TikTok'] },
+    { id: 'exec', n: 'Исполнитель', h: 150, rows: 3, who: 'По-настоящему решает задание зрителя: считает, пишет, составляет. Его результат попадает в ролик.', when: 'После выбора задания.', tools: ['расчёты', 'тексты'] },
+    { id: 'script', n: 'Сценарист', h: 170, rows: 4, who: 'Раскладывает результат по сценам: текст на экране, реплики озвучки, хук в первые 2 секунды.', when: 'Когда результат готов.', tools: ['сцены', 'реплики'] },
+    { id: 'mont', n: 'Монтажёр', h: 20, rows: 4, who: 'Собирает ролик 9:16: анимация, озвучка, рендер в mp4.', when: 'Когда сценарий утверждён.', tools: ['озвучка', 'рендер mp4'] },
+    { id: 'ctrl', n: 'Контролёр', h: 15, rows: 3, who: 'Не делал ролик и поэтому видит ошибки: обрезанный текст, неверные факты, лишнюю длину.', when: 'Перед сдачей ролика вам.', tools: ['кадры', 'звук', 'факты'] },
+    { id: 'comm', n: 'Комьюнити-менеджер', h: 305, rows: 3, who: 'Пишет подпись до 150 символов, хэштеги, выбирает обложку и готовит ответы на комментарии.', when: 'Последний шаг перед публикацией.', tools: ['подпись', 'хэштеги', 'ответы'] },
+    { id: 'tt', n: 'TikTok-агент', h: 350, rows: 4, who: 'Ведёт TikTok целиком: идеи, сценарии, подписи, план публикаций и разбор статистики.', when: 'Для любых задач по TikTok вне готового ролика.', tools: ['тренды', 'план публикаций'] } ] },
+  { id: 'v', name: 'Киностудия', note: 'Видео из ваших материалов и с нуля', a: [
+    { id: 'vid', n: 'Монтаж видео', h: 20, rows: 4, who: 'Монтирует готовое видео из ваших фото, клипов и музыки по сценарию: титры, переходы, рендер.', when: 'Когда у вас есть исходники.', tools: ['нарезка', 'титры', 'переходы'] },
+    { id: 'vzero', n: 'Видео с нуля', h: 170, rows: 5, who: 'Делает новое видео без исходников: анимация, озвучка, монтаж.', when: 'Когда есть только идея.', tools: ['анимация', 'озвучка'] } ] },
+  { id: 'b', name: 'Деловой район', note: 'Сайты, сметы и бумаги', a: [
+    { id: 'site', n: 'Сайт и чат-бот', h: 200, rows: 5, who: 'Строит сайт или страницу с ИИ-чатом: структура, тексты, дизайн, публикация и правки.', when: 'Когда нужен сайт, лендинг или бот для посетителей.', tools: ['страница', 'чат-ассистент'] },
+    { id: 'smeta', n: 'Смета', h: 40, rows: 4, who: 'Считает смету и расходы по дому в таблице.', when: 'Расчёты по стройке и ремонту. Роликов про стройку в @ii_vedet нет.', tools: ['таблица', 'формулы'] },
+    { id: 'docs', n: 'Документы', h: 240, rows: 4, who: 'Пишет письма, планы и отчёты, которые можно редактировать и отправлять.', when: 'Когда нужен текст на бумагу.', tools: ['Docs', 'экспорт в Word и PDF'] } ] },
+  { id: 'l', name: 'Библиотека и приёмная', note: 'Знания и расписание', a: [
+    { id: 'res', n: 'Исследования', h: 120, rows: 5, who: 'Разбирается в теме по многим источникам, сравнивает варианты и пишет связный отчёт.', when: 'Когда надо понять тему или выбрать из вариантов.', tools: ['поиск', 'сравнение'] },
+    { id: 'sec', n: 'Секретарь', h: 300, rows: 3, who: 'Ставит встречи, напоминания и будильники.', when: 'Когда нужно ничего не забыть.', tools: ['календарь', 'напоминания'] } ] }
+];
+const city = document.getElementById('city'), card = document.getElementById('card');
+let sel = null, seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+function show(a, d, btn) {
+  document.querySelectorAll('.bld').forEach(b => b.setAttribute('aria-pressed', b === btn));
+  card.innerHTML = '<div class="l"><div class="where">' + esc(d.name) + '</div><h3>' + esc(a.n) + '</h3><p>' + esc(a.who) + '</p></div>' +
+    '<div class="r"><p><b>Когда звать:</b> ' + esc(a.when) + '</p><div class="tags">' + a.tools.map(t => '<span>' + esc(t) + '</span>').join('') + '</div></div>';
+}
+let first = null;
+DISTRICTS.forEach(d => {
+  const sec = document.createElement('section'); sec.className = 'district';
+  sec.innerHTML = '<div class="dname"><h2>' + esc(d.name) + '</h2><span>' + esc(d.note) + '</span></div><div class="skyline"></div>';
+  const sk = sec.querySelector('.skyline');
+  d.a.forEach(a => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'bld'; b.setAttribute('aria-pressed', 'false'); b.dataset.id = a.id; b.dataset.state = 'idle';
+    const cells = a.rows * 3; let wins = '';
+    for (let i = 0; i < cells; i++) wins += '<i class="w' + (rnd() > .38 ? ' on' : '') + '"></i>';
+    b.innerHTML = '<div class="body" style="--h:' + a.h + '">' + wins + '<i class="door"></i></div><i class="st"></i><div class="lab">' + esc(a.n) + '</div>';
+    b.addEventListener('click', () => show(a, d, b));
+    sk.appendChild(b);
+    if (!first) first = [a, d, b];
+  });
+  const road = document.createElement('div'); road.className = 'road';
+  let ppl = '';
+  for (let i = 0; i < 3; i++) ppl += '<i class="p" style="--h:' + d.a[i % d.a.length].h + ';--t:' + (16 + i * 7) + 's;--d:-' + (i * 6) + 's"></i>';
+  ppl += '<i class="car" style="--h:' + d.a[0].h + ';--t:' + (9 + d.a.length) + 's;--d:-' + (d.a.length * 2) + 's"></i>';
+  road.innerHTML = ppl; sec.appendChild(road); city.appendChild(sec);
+});
+show(first[0], first[1], first[2]);
+const NAMES = {}; DISTRICTS.forEach(d => d.a.forEach(a => NAMES[a.id] = a.n));
+const LBL = { working: 'работает', done: 'закончил', idle: 'свободен' };
+let live = {}, loaded = false;
+const fmt = ts => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)); return s < 60 ? s + ' с назад' : s < 3600 ? Math.round(s / 60) + ' мин назад' : Math.round(s / 3600) + ' ч назад'; };
+function paint() {
+  document.querySelectorAll('.bld').forEach(b => {
+    const v = live[b.dataset.id]; b.dataset.state = v ? v.state : 'idle';
+    const old = b.querySelector('.bub'); if (old) old.remove();
+    if (v && v.state === 'working' && v.task) { const t = document.createElement('div'); t.className = 'bub'; t.textContent = v.task; b.appendChild(t); }
+  });
+  const rows = Object.entries(live).filter(([, v]) => v.state !== 'idle').sort((a, b) => b[1].ts - a[1].ts).slice(0, 7);
+  const ul = document.getElementById('feed');
+  ul.innerHTML = rows.length ? rows.map(([id, v]) => '<li><b>' + esc(NAMES[id] || id) + '</b><em>' + (LBL[v.state] || v.state) + (v.task ? ': ' + esc(v.task) : '') + '</em><time data-ts="' + v.ts + '">' + fmt(v.ts) + '</time></li>').join('')
+    : '<li class="empty">' + (loaded ? 'Все агенты свободны. Дайте задачу, и дома оживут.' : 'Нет связи с базой, город показывает только расположение агентов.') + '</li>';
+}
+setInterval(() => document.querySelectorAll('#feed time').forEach(t => t.textContent = fmt(+t.dataset.ts)), 1000);
+paint();
+(async () => {
+  try {
+    const db = await claude.use('db'); if (!db) return;
+    db.collection('status').onSnapshot(snap => {
+      live = {}; loaded = true;
+      snap.docs.forEach(d => { const x = d.data(); if (x && typeof x.state === 'string') live[d.id] = { state: x.state, task: String(x.task || ''), ts: +x.ts || 0 }; });
+      paint();
+    }, () => { loaded = false; paint(); });
+  } catch (e) { /* без базы город остаётся статичным */ }
+})();
+document.getElementById('tg').addEventListener('click', () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme.indexOf('dark') === 0;
+  r.setAttribute('data-theme', dark ? 'light' : 'dark');
+});
+</script>
