@@ -1,4 +1,4 @@
-<title>Город агентов</title>
+<title>Корпорация агентов</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@500;700;800&display=swap">
 <style>
@@ -18,12 +18,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 .clock { font: 600 38px/1.05 var(--mono); letter-spacing: -1px; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .date { font: 500 12px var(--mono); color: var(--dim); margin-top: 2px; }
-.metrics { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 6px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.metrics { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 10px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .metrics div { font: 500 10px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
 .metrics b { display: block; font: 700 17px var(--mono); color: var(--ink); letter-spacing: 0; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.metrics .neg b { color: var(--live); }
+.log li.corp, .log li.corp b { color: var(--cyan); }
+.org { left: max(14px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(300px, calc(100vw - 28px)); padding: 12px 14px; max-height: 32vh; overflow-y: auto; }
+.org ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.org li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font: 500 11.5px var(--mono); color: var(--dim); }
+.org li b { color: var(--ink); font-weight: 700; text-align: right; }
+.org li em { grid-column: 1 / -1; font-style: normal; font-size: 10px; color: var(--faint); }
 .note { font: 500 10.5px/1.45 var(--mono); color: var(--faint); margin-top: 10px; }
 .note em { font-style: normal; color: var(--live); }
-.log { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(14px, env(safe-area-inset-right, 0px)); width: min(380px, calc(100vw - 28px)); padding: 12px 14px; max-height: 46vh; overflow: hidden; }
+.log { top: calc(14px + env(safe-area-inset-top, 0px)); right: max(14px, env(safe-area-inset-right, 0px)); width: min(400px, calc(100vw - 28px)); padding: 12px 14px; max-height: 52vh; overflow: hidden; }
 .log ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
 .log li { font: 400 11.5px/1.4 var(--mono); color: var(--dim); display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
 .log li time { color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -52,23 +59,29 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
   .log li { grid-template-columns: 54px 1fr; font-size: 10.5px; }
   body.sel .log { display: none; }
   .note { display: none; }
+  .org { display: none; }
 }
 </style>
 
-<canvas id="c" aria-label="3D-город ИИ-агентов"></canvas>
+<canvas id="c" aria-label="3D-корпорация ИИ-агентов"></canvas>
 <section class="ui hud">
-  <div class="eyebrow"><i></i>Город агентов · онлайн</div>
+  <div class="eyebrow"><i></i>Корпорация агентов · онлайн</div>
   <div class="clock" id="clock">--:--:--</div>
   <div class="date" id="date"></div>
   <div class="metrics">
-    <div><b id="mOn">17</b>агентов</div>
+    <div><b id="mHead">0</b>штат</div>
+    <div><b id="mBud">0</b>бюджет</div>
     <div><b id="mTasks">0</b>задач сегодня</div>
     <div><b id="mVid">0</b>роликов</div>
     <div><b id="mLoad">0%</b>нагрузка</div>
+    <div><b id="mDep">0</b>отделов</div>
+    <div><b id="mHire">0</b>нанято</div>
+    <div><b id="mFire">0</b>уволено</div>
   </div>
-  <div class="note">Фоновая активность сети — модель. <em>LIVE</em> — реальная работа агента сейчас.</div>
+  <div class="note">Корпорация — модель: найм, бюджет и задачи симулируются. <em>LIVE</em> — реальная работа агента сейчас.</div>
 </section>
-<section class="ui log" aria-live="polite"><div class="eyebrow">Журнал сети</div><ul id="log"></ul></section>
+<section class="ui log" aria-live="polite"><div class="eyebrow">Журнал корпорации</div><ul id="log"></ul></section>
+<section class="ui org"><div class="eyebrow">Структура</div><ul id="org"></ul></section>
 <aside class="ui card" id="card" hidden></aside>
 <div id="tags"></div>
 
@@ -82,10 +95,21 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (() => {
-// ================= агенты =================
-const DIST = { c: 'Ядро', t: 'Кластер @ii_vedet', v: 'Видеокластер', b: 'Деловой кластер', l: 'Знания и расписание' };
-const AG = [
+// ================= корпорация: базовый штат =================
+const DEPT_NAME = { c: 'Ядро', t: 'Кластер @ii_vedet', v: 'Видеокластер', b: 'Деловой кластер', l: 'Знания и расписание', h: 'Кадры и финансы', s: 'Поддержка', m: 'Продажи', q: 'Безопасность', e: 'Обучение агентов' };
+const DEPT_HUE = { c: 265, t: 335, v: 30, b: 170, l: 200, h: 50, s: 120, m: 15, q: 350, e: 85 };
+const DEPT_WHO = { t: 'Помогает делать ролики @ii_vedet.', v: 'Работает над видеопроизводством.', b: 'Закрывает деловые задачи.', l: 'Работает со знаниями и расписанием.', s: 'Отвечает пользователям и разбирает обращения.', m: 'Ищет клиентов и ведёт сделки.', q: 'Следит за безопасностью и качеством.', e: 'Обучает других агентов.', h: 'Обслуживает штат и бюджет.' };
+const POOL = {
+  t: ['Копирайтер', 'Ресёрчер трендов', 'Аниматор', 'Редактор', 'Хэштег-аналитик'], v: ['Цветокоррекция', 'Субтитры', 'Звукорежиссёр'],
+  b: ['Бухгалтер', 'Верстальщик', 'Юрист-ассистент', 'Аналитик продаж'], l: ['Архивариус', 'Переводчик', 'Календарь-менеджер'],
+  s: ['Оператор чата', 'Модератор', 'Служба отзывов'], m: ['Лидогенерация', 'Менеджер сделок'], q: ['Аудитор', 'Мониторинг'], e: ['Тренер агентов', 'Методист'],
+  h: ['Рекрутер'],
+};
+const NEW_DEPTS = ['s', 'm', 'q', 'e'];
+const BASE = [
   { id: 'dir', d: 'c', n: 'Директор', c: '#c9b6ff', who: 'Центральное ядро: принимает задачи, раздаёт их агентам и собирает результат.' },
+  { id: 'hr', d: 'h', n: 'Кадры', c: '#ffd166', who: 'Подбирает и увольняет агентов, следит за штатом.' },
+  { id: 'fin', d: 'h', n: 'Финансы', c: '#59f0a8', who: 'Ведёт бюджет вычислений и согласует найм.' },
   { id: 'prod', d: 't', n: 'Продюсер', c: '#ff4f87', who: 'Ведёт ролик @ii_vedet от задания зрителя до публикации.' },
   { id: 'scout', d: 't', n: 'Скаут', c: '#5fe3ff', who: 'Читает комментарии и ищет тренды.' },
   { id: 'anal', d: 't', n: 'Аналитик', c: '#7aa8ff', who: 'Считает просмотры, досмотры и делает выводы.' },
@@ -103,37 +127,98 @@ const AG = [
   { id: 'res', d: 'l', n: 'Исследования', c: '#6fd0ff', who: 'Изучает темы по многим источникам.' },
   { id: 'sec', d: 'l', n: 'Секретарь', c: '#b8a6ff', who: 'Встречи, напоминания, будильники.' },
 ];
-const byId = {}; AG.forEach(a => byId[a.id] = a);
 const PIPE = [['scout', 'задания и тренды'], ['anal', 'статистика'], ['exec', 'решение задания'], ['script', 'сценарий'], ['mont', 'монтаж'], ['ctrl', 'проверка'], ['comm', 'подпись и теги']];
 const JOBS = {
   tt: ['план публикаций', 'идеи роликов', 'отчёт по охватам'], vid: ['монтаж из фото', 'нарезка клипов'], vzero: ['анимация', 'озвучка'],
   site: ['лендинг', 'чат-бот', 'правки страницы'], smeta: ['смета', 'пересчёт расходов'], docs: ['письмо', 'план недели', 'отчёт'],
-  res: ['сравнение вариантов', 'разбор темы'], sec: ['напоминание', 'встреча'],
+  res: ['сравнение вариантов', 'разбор темы'], sec: ['напоминание', 'встреча'], hr: ['разбор штата', 'оценка эффективности'], fin: ['сверка бюджета', 'отчёт по расходам'],
 };
+const DJOBS = { t: ['набросок поста', 'проверка идей'], v: ['правка видео', 'дорожка звука'], b: ['расчёт', 'документ'], l: ['сводка знаний', 'перевод'], s: ['ответ пользователю', 'разбор обращения'], m: ['список клиентов', 'коммерческое предложение'], q: ['проверка доступов', 'аудит качества'], e: ['обучающий курс', 'тест для агентов'], h: ['разбор штата'] };
+const jobsFor = a => JOBS[a.id] || DJOBS[a.d] || ['задача'];
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-// ================= состояние (хранится в этом браузере) =================
-const KEY = 'agent-city-live-v1';
+// ================= модель корпорации =================
+const KEY = 'agent-city-corp-v1', MAX = 48, START_BUDGET = 600;
 const today = () => new Date().toDateString();
-const st = { day: today(), tasksToday: 0, videos: 0, agents: {} };
+const st = { day: today(), tasksToday: 0, videos: 0, budget: START_BUDGET, depts: ['t', 'v', 'b', 'l', 'h'], hired: [], seq: 0, hiredTotal: 0, firedTotal: 0, agents: {}, load: {}, inc: 0, cost: 0 };
 let saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
 if (saved && saved.v === 1) Object.assign(st, saved.st);
-AG.forEach(a => st.agents[a.id] = Object.assign({ lvl: 1, xp: 0, done: 0 }, st.agents[a.id]));
+const defs = () => BASE.concat(st.hired);
+const heads = () => defs().length - 1;
+const ensureStats = () => defs().forEach(a => { st.agents[a.id] = Object.assign({ lvl: 1, xp: 0, done: 0 }, st.agents[a.id]); });
+ensureStats();
 const need = l => 4 + l * 3;
-function grow(id, n, quiet) { const s = st.agents[id]; s.xp += n; while (s.xp >= need(s.lvl)) { s.xp -= need(s.lvl); s.lvl++; if (!quiet) logLine(`<b>${byId[id].n}</b>: мощность выросла до ${s.lvl}`); } }
-function reward(id, n) { st.agents[id].done += 1; grow(id, n); }
+const roleOf = l => l >= 10 ? 'руководитель' : l >= 5 ? 'старший' : l >= 2 ? 'специалист' : 'стажёр';
+const hireCost = () => 90 + heads() * 4;
+let logLine = () => {};
+function grow(id, n, quiet) {
+  const s = st.agents[id]; if (!s) return; s.xp += n;
+  while (s.xp >= need(s.lvl)) {
+    s.xp -= need(s.lvl); s.lvl++;
+    if (!quiet) { const nm = (defs().find(d => d.id === id) || {}).n; logLine(`<b>${esc(nm)}</b>: ${s.lvl === 5 || s.lvl === 10 ? 'повышен до роли «' + roleOf(s.lvl) + '»' : 'мощность выросла до ' + s.lvl}`); }
+  }
+}
 function countTask() { if (st.day !== today()) { st.day = today(); st.tasksToday = 0; } st.tasksToday++; }
+function earn(id, base) { const g = base + (st.agents[id] ? st.agents[id].lvl * 1.5 : 0); st.budget += g; st.inc += g; }
+function reward(id, n) { if (!st.agents[id]) return; st.agents[id].done++; grow(id, n); earn(id, 11); }
+
+// --- решения отдела кадров (одна и та же логика для живого времени и для офлайна)
+function titleFor(dept) {
+  const pool = POOL[dept] || ['Агент'], base = pool[Math.floor(Math.random() * pool.length)];
+  const same = defs().filter(d => d.n === base || d.n.startsWith(base + ' ')).length;
+  return same ? base + ' ' + (same + 1) : base;
+}
+function pickDept() {
+  const open = st.depts.filter(d => d !== 'h' || (Math.random() < .12 && st.hired.filter(x => x.d === 'h').length < 3));
+  const w = open.map(d => 1 + (st.load[d] || 0) * 4), sum = w.reduce((a, b) => a + b, 0); let r = Math.random() * sum;
+  for (let i = 0; i < open.length; i++) { r -= w[i]; if (r <= 0) return open[i]; }
+  return open[0];
+}
+function hrDecide(nowMs) {
+  if (st.budget < 40) {
+    const h = st.hired.slice().sort((a, b) => st.agents[a.id].done / (nowMs - a.born + 6e4) - st.agents[b.id].done / (nowMs - b.born + 6e4))[0];
+    if (h) return { type: 'fire', id: h.id, why: 'сокращение из-за дефицита бюджета' };
+  }
+  for (const h of st.hired) if ((nowMs - h.born) / 6e4 > 25 && st.agents[h.id].done < 2 && Math.random() < .4) return { type: 'fire', id: h.id, why: 'низкая эффективность по итогам оценки' };
+  const free = NEW_DEPTS.filter(d => !st.depts.includes(d));
+  if (st.budget > 1500 && heads() >= 22 && free.length && Math.random() < .35) return { type: 'opendept', dept: free[0], cost: 200 };
+  if (st.budget > hireCost() + 250 && heads() < MAX) return { type: 'hire', dept: pickDept(), cost: hireCost() };
+  return null;
+}
+const mkColor = d => '#' + new THREE.Color().setHSL(((DEPT_HUE[d] || 200) + (Math.random() * 30 - 15) + 360) % 360 / 360, .7, .65).getHexString();
+function applyAction(act, live, nowMs) {
+  if (act.type === 'fire') {
+    const i = st.hired.findIndex(h => h.id === act.id); if (i < 0) return null;
+    const def = st.hired.splice(i, 1)[0]; delete st.agents[def.id]; st.firedTotal++;
+    return Object.assign({ def }, act);
+  }
+  let dept = act.dept;
+  if (act.type === 'opendept') st.depts.push(dept);
+  const lead = act.type === 'opendept';
+  const def = { id: 'h' + (++st.seq), n: lead ? 'Руководитель: ' + DEPT_NAME[dept] : titleFor(dept), d: dept, c: mkColor(dept), who: (DEPT_WHO[dept] || '') + ' Принят в штат автоматически.', born: nowMs };
+  st.hired.push(def); st.agents[def.id] = { lvl: lead ? 4 : 1, xp: 0, done: 0 }; st.budget -= act.cost; st.cost += act.cost; st.hiredTotal++;
+  return Object.assign({ def }, act);
+}
+
+// --- пока страница была закрыта
 let welcome = '';
 if (st.day !== today()) { st.day = today(); st.tasksToday = 0; }
 if (saved && saved.savedAt) {
-  const away = Math.min(3 * 86400, Math.max(0, (Date.now() - saved.savedAt) / 1000));
-  const n = Math.floor(away / 40);
-  if (n > 0) {
-    for (let i = 0; i < n; i++) { const id = AG[1 + Math.floor(Math.random() * (AG.length - 1))].id; st.agents[id].done++; grow(id, 1, true); }
-    const vids = Math.floor(n / 16); st.videos += vids;
-    const sinceMidnight = (Date.now() - new Date().setHours(0, 0, 0, 0)) / 1000;
-    st.tasksToday += Math.floor(Math.min(away, sinceMidnight) / 40);
-    welcome = `Пока вас не было, сеть выполнила ${n} задач и выпустила ${vids} роликов`;
+  const away = Math.min(3 * 86400e3, Math.max(0, Date.now() - saved.savedAt));
+  if (away > 120e3) {
+    const midnight = new Date().setHours(0, 0, 0, 0);
+    const sum = { tasks: 0, vids: 0, hired: 0, fired: 0, dept: 0 };
+    for (let t = saved.savedAt + 120e3; t <= saved.savedAt + away; t += 120e3) {
+      const hc = heads(), tasks = hc * .58;
+      const inc = tasks * 12.5, up = hc * 5; st.budget += inc - up; st.inc += inc; st.cost += up;
+      const n = Math.floor(tasks + Math.random());
+      for (let i = 0; i < n; i++) { const arr = defs().slice(1), a = arr[Math.floor(Math.random() * arr.length)]; st.agents[a.id].done++; grow(a.id, 1, true); }
+      sum.tasks += n; if (t >= midnight) st.tasksToday += n; const v = Math.random() < .28 ? 1 : 0; st.videos += v; sum.vids += v;
+      if (st.budget > 5000) { st.budget -= 2000; defs().forEach(d => grow(d.id, 3, true)); }
+      const act = hrDecide(t); if (act) { const r = applyAction(act, false, t); if (r) { act.type === 'fire' ? sum.fired++ : sum.hired++; if (act.type === 'opendept') sum.dept++; } }
+    }
+    ensureStats();
+    welcome = `Пока вас не было: ${sum.tasks} задач, ${sum.vids} роликов, нанято ${sum.hired}, уволено ${sum.fired}` + (sum.dept ? `, открыто отделов: ${sum.dept}` : '');
   }
 }
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, st, savedAt: Date.now() })); } catch (e) {} };
@@ -146,43 +231,36 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x05060f, .011);
-const camera = new THREE.PerspectiveCamera(38, 1, .1, 600);
-camera.position.set(58, 34, 58);
+scene.fog = new THREE.FogExp2(0x05060f, .01);
+const camera = new THREE.PerspectiveCamera(38, 1, .1, 700);
+camera.position.set(84, 50, 84);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.target.set(0, 6, 0); controls.enableDamping = true; controls.dampingFactor = .06;
-controls.maxPolarAngle = 1.45; controls.minDistance = 18; controls.maxDistance = 140;
+controls.maxPolarAngle = 1.45; controls.minDistance = 18; controls.maxDistance = 170;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 controls.autoRotate = !reduce; controls.autoRotateSpeed = .22;
 let idleT = 0; controls.addEventListener('start', () => { controls.autoRotate = false; idleT = 0; });
-
 const hemi = new THREE.HemisphereLight(0x9fb6ff, 0x0a0c18, .35); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1dd, 1); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 1, far: 200 }); sun.shadow.bias = -.0005;
+Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 220 }); sun.shadow.bias = -.0005;
 scene.add(sun, sun.target);
-
 const composer = new THREE.EffectComposer(renderer);
 composer.addPass(new THREE.RenderPass(scene, camera));
-const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .9, .55, .62);
-composer.addPass(bloom);
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), .9, .55, .62); composer.addPass(bloom);
 
-// --- земля: тёмный металл с тонкой сеткой
-const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 96), new THREE.MeshStandardMaterial({ color: 0x0a0d1a, metalness: .75, roughness: .42 }));
+const ground = new THREE.Mesh(new THREE.CircleGeometry(200, 96), new THREE.MeshStandardMaterial({ color: 0x0a0d1a, metalness: .75, roughness: .42 }));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-const grid = new THREE.GridHelper(200, 100, 0x2b3566, 0x1a2140); grid.material.transparent = true; grid.material.opacity = .22; grid.position.y = .01; scene.add(grid);
+const grid = new THREE.GridHelper(260, 130, 0x2b3566, 0x1a2140); grid.material.transparent = true; grid.material.opacity = .22; grid.position.y = .01; scene.add(grid);
 function ringLine(r, color, op) {
   const pts = []; for (let i = 0; i <= 160; i++) { const t = i / 160 * Math.PI * 2; pts.push(new THREE.Vector3(Math.sin(t) * r, .03, Math.cos(t) * r)); }
   scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity: op })));
 }
-ringLine(13, 0x5fe3ff, .35); ringLine(16.5, 0x5fe3ff, .12); ringLine(34, 0x7a6bff, .14);
+ringLine(13, 0x5fe3ff, .35); ringLine(16.5, 0x5fe3ff, .12); ringLine(26, 0x7a6bff, .1); ringLine(32.5, 0x7a6bff, .1); ringLine(39, 0x7a6bff, .08);
 
-// --- светящаяся точка-спрайт
 const glowTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d');
   const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.25, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv); })();
 const glow = (color, size, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, opacity: op == null ? 1 : op, blending: THREE.AdditiveBlending, depthWrite: false })); s.scale.setScalar(size); return s; };
-
-// --- фасады: тонкие полосы светящихся окон
 function facadeTex(seed) {
   const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const g = cv.getContext('2d');
   g.fillStyle = '#000'; g.fillRect(0, 0, 64, 256);
@@ -192,36 +270,30 @@ function facadeTex(seed) {
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
-// --- размещение: кластеры по кругу, два ряда для глубины
-const order = []; let k = 0;
-['t', 'v', 'b', 'l'].forEach(d => { AG.filter(a => a.d === d).forEach(a => order.push([a, k++])); k += 1.2; });
-const TOTAL = k;
-const pickables = [], towerMats = [];
-AG.forEach((a, i) => {
-  a.col = new THREE.Color(a.c);
-  let pos, w;
-  if (a.id === 'dir') { pos = new THREE.Vector3(0, 0, 0); w = 6.5; }
-  else {
-    const slot = order.find(o => o[0] === a)[1], ang = slot / TOTAL * Math.PI * 2, r = slot % 2 ? 29 : 22.5;
-    pos = new THREE.Vector3(Math.sin(ang) * r, 0, Math.cos(ang) * r); w = 3.6 + (slot % 3) * .5; a.ang = ang;
-  }
-  a.pos = pos; a.w = w;
-  const g = new THREE.Group(); g.position.copy(pos); if (a.ang != null) g.rotation.y = a.ang; scene.add(g);
+// ================= агенты в сцене =================
+const AG = [], byId = {}, pickables = [], towerMats = [];
+let spawned = 0;
+const heightOf = a => (a.id === 'dir' ? 16 : 5) + Math.min(18, 3.2 * Math.sqrt(((st.agents[a.id] || { lvl: 1 }).lvl - 1)));
+const dir_ = () => byId.dir;
+function spawn(def, animate) {
+  const i = spawned++;
+  const a = Object.assign({}, def); a.col = new THREE.Color(def.c);
+  a.w = def.id === 'dir' ? 6.5 : 3.6 + (i % 3) * .5; a.pos = new THREE.Vector3(); a.tpos = new THREE.Vector3(); a.placed = false;
+  const g = new THREE.Group(); scene.add(g); a.g = g;
   const tex = facadeTex(1000 + i * 7919);
   const side = new THREE.MeshStandardMaterial({ color: 0x0b1022, metalness: .9, roughness: .18, emissive: a.col.clone().lerp(new THREE.Color(0xffffff), .35), emissiveMap: tex, emissiveIntensity: .6 });
   const top = new THREE.MeshStandardMaterial({ color: 0x0a0e1e, metalness: .5, roughness: .6 });
-  towerMats.push(side); a.tex = tex;
+  a.mats = [side, top]; towerMats.push(side); a.tex = tex;
   const box = new THREE.BoxGeometry(1, 1, 1); box.translate(0, .5, 0);
-  const tower = new THREE.Mesh(box, [side, side, top, top, side, side]); tower.scale.set(w, 1, w); tower.castShadow = tower.receiveShadow = true;
+  const tower = new THREE.Mesh(box, [side, side, top, top, side, side]); tower.scale.set(a.w, 1, a.w); tower.castShadow = tower.receiveShadow = true;
   tower.userData.id = a.id; pickables.push(tower); g.add(tower); a.tower = tower;
   const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: a.col, transparent: true, opacity: .55 }));
   edges.scale.copy(tower.scale); g.add(edges); a.edges = edges;
-  const crown = new THREE.Mesh(new THREE.BoxGeometry(w + .02, .12, w + .02), new THREE.MeshBasicMaterial({ color: a.col, toneMapped: false })); g.add(crown); a.crown = crown;
-  const base = new THREE.Mesh(new THREE.RingGeometry(w * .78, w * .82, 64), new THREE.MeshBasicMaterial({ color: a.col, transparent: true, opacity: .5, toneMapped: false }));
-  base.rotation.x = -Math.PI / 2; base.position.y = .04; g.add(base);
-  // ИИ-ядро над башней
+  const crown = new THREE.Mesh(new THREE.BoxGeometry(a.w + .02, .12, a.w + .02), new THREE.MeshBasicMaterial({ color: a.col, toneMapped: false })); g.add(crown); a.crown = crown;
+  const base = new THREE.Mesh(new THREE.RingGeometry(a.w * .78, a.w * .82, 64), new THREE.MeshBasicMaterial({ color: a.col, transparent: true, opacity: .5, toneMapped: false }));
+  base.rotation.x = -Math.PI / 2; base.position.y = .04; g.add(base); a.base = base;
   const core = new THREE.Group(); scene.add(core); a.core = core;
-  const R = a.id === 'dir' ? 1.6 : .7;
+  const R = a.id === 'dir' ? 1.6 : .7; a.R = R;
   const orb = new THREE.Mesh(new THREE.SphereGeometry(R * .55, 32, 24), new THREE.MeshBasicMaterial({ color: a.col.clone().lerp(new THREE.Color(0xffffff), .35), toneMapped: false }));
   const shell = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(R, 1)), new THREE.LineBasicMaterial({ color: a.col, transparent: true, opacity: .55 }));
   const ring1 = new THREE.Mesh(new THREE.TorusGeometry(R * 1.45, .025, 6, 96), new THREE.MeshBasicMaterial({ color: a.col, toneMapped: false, transparent: true, opacity: .8 }));
@@ -231,33 +303,48 @@ AG.forEach((a, i) => {
   live.rotation.x = Math.PI / 2; live.visible = false;
   orb.userData.id = a.id; pickables.push(orb);
   core.add(halo, orb, shell, ring1, ring2, live);
-  Object.assign(a, { orb, shell, ring1, ring2, halo, live, R, h: 0, busy: 0, say: '', pending: false, next: 8 + Math.random() * 50 });
-  if (a.id === 'dir') { a.extra = [0, 1].map(j => { const rr = new THREE.Mesh(new THREE.TorusGeometry(R * (2.4 + j * .7), .03, 6, 128), ring1.material); rr.rotation.x = Math.PI / 2 + (j ? .5 : -.4); core.add(rr); return rr; }); }
+  Object.assign(a, { orb, shell, ring1, ring2, halo, live, h: animate ? 0 : heightOf(a), busy: 0, say: '', pending: false, next: 8 + Math.random() * 50, age: animate ? 0 : 9, leaving: false, pulse: animate ? 1.5 : 0 });
+  if (a.id === 'dir') a.extra = [0, 1].map(j => { const rr = new THREE.Mesh(new THREE.TorusGeometry(R * (2.4 + j * .7), .03, 6, 128), ring1.material); rr.rotation.x = Math.PI / 2 + (j ? .5 : -.4); core.add(rr); return rr; });
   const tag = document.createElement('div'); tag.className = 'tag'; document.getElementById('tags').appendChild(tag); a.tag = tag;
-});
-const heightOf = a => (a.id === 'dir' ? 16 : 6) + Math.min(40, (st.agents[a.id].lvl - 1) * 1.6);
-AG.forEach(a => a.h = heightOf(a));
-const corePos = (a, out) => out.set(a.pos.x, a.h + (a.id === 'dir' ? 4 : 2.4), a.pos.z);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(new Array(41).fill(0).map(() => new THREE.Vector3())),
+    new THREE.LineBasicMaterial({ color: a.col, transparent: true, opacity: .14, blending: THREE.AdditiveBlending, depthWrite: false }));
+  if (a.id !== 'dir') scene.add(line); a.line = line;
+  AG.push(a); byId[a.id] = a; return a;
+}
+function despawn(a) {
+  scene.remove(a.g, a.core, a.line); a.tag.remove();
+  [a.tower, a.orb].forEach(m => { const i = pickables.indexOf(m); if (i >= 0) pickables.splice(i, 1); });
+  const k = towerMats.indexOf(a.mats[0]); if (k >= 0) towerMats.splice(k, 1);
+  const j = AG.indexOf(a); if (j >= 0) AG.splice(j, 1); delete byId[a.id];
+}
+defs().forEach(d => spawn(d, false));
 
-// --- постоянные линии связи с ядром
-const dir = byId.dir;
+// --- раскладка: отделы секторами по кольцам; при найме город перестраивается плавно
+const RADII = [22.5, 29, 35.5];
+function relayout() {
+  const order = [], deptList = st.depts.filter(d => d !== 'c');
+  deptList.forEach(d => AG.filter(a => a.d === d && !a.leaving).forEach(a => order.push(a)));
+  const total = order.length + deptList.length * 1.2; let k = 0, last = null;
+  order.forEach(a => {
+    if (last && a.d !== last) k += 1.2; last = a.d;
+    const ang = k / total * Math.PI * 2, r = RADII[Math.round(k) % 3]; k++;
+    a.tpos.set(Math.sin(ang) * r, 0, Math.cos(ang) * r);
+    if (!a.placed) { a.pos.copy(a.tpos); a.placed = true; }
+  });
+  const d = byId.dir; if (d && !d.placed) { d.pos.set(0, 0, 0); d.tpos.set(0, 0, 0); d.placed = true; }
+}
+relayout();
+const corePos = (a, out) => out.set(a.pos.x, a.h + (a.id === 'dir' ? 4 : 2.4), a.pos.z);
 function arc(a, b) {
   const p0 = corePos(a, new THREE.Vector3()), p2 = corePos(b, new THREE.Vector3());
   const mid = p0.clone().add(p2).multiplyScalar(.5); mid.y = Math.max(p0.y, p2.y) + 4 + p0.distanceTo(p2) * .22;
   return new THREE.QuadraticBezierCurve3(p0, mid, p2);
 }
-const links = AG.filter(a => a.id !== 'dir').map(a => {
-  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(new Array(41).fill(0).map(() => new THREE.Vector3())),
-    new THREE.LineBasicMaterial({ color: a.col, transparent: true, opacity: .14, blending: THREE.AdditiveBlending, depthWrite: false }));
-  scene.add(line); return [a, line];
-});
-function updateLinks() { links.forEach(([a, line]) => { const pts = arc(a, dir).getPoints(40), pos = line.geometry.attributes.position; pts.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z)); pos.needsUpdate = true; }); }
-updateLinks();
+function updateLinks() { const d = byId.dir; AG.forEach(a => { if (a.id === 'dir') return; const pts = arc(a, d).getPoints(40), pos = a.line.geometry.attributes.position; pts.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z)); pos.needsUpdate = true; }); }
 
-// --- пыль в воздухе
 const dust = (() => {
-  const n = 700, geo = new THREE.BufferGeometry(), arr = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { const r = Math.random() * 60, t = Math.random() * Math.PI * 2; arr[i * 3] = Math.sin(t) * r; arr[i * 3 + 1] = Math.random() * 40; arr[i * 3 + 2] = Math.cos(t) * r; }
+  const n = 800, geo = new THREE.BufferGeometry(), arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const r = Math.random() * 75, t = Math.random() * Math.PI * 2; arr[i * 3] = Math.sin(t) * r; arr[i * 3 + 1] = Math.random() * 45; arr[i * 3 + 2] = Math.cos(t) * r; }
   geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
   const p = new THREE.Points(geo, new THREE.PointsMaterial({ size: .18, map: glowTex, color: 0x9fb6ff, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false }));
   scene.add(p); return p;
@@ -266,62 +353,94 @@ const dust = (() => {
 // ================= журнал =================
 const logEl = document.getElementById('log'); const lines = [];
 const hhmmss = d => d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-function logLine(html, live) {
-  lines.unshift({ html, live, t: hhmmss(new Date()) }); lines.length = Math.min(lines.length, 9);
-  logEl.innerHTML = lines.map(l => `<li class="${l.live ? 'live' : ''}"><time>${l.t}</time><span>${l.html}</span></li>`).join('');
-}
+logLine = function (html, live, corp) {
+  lines.unshift({ html, live, corp, t: hhmmss(new Date()) }); lines.length = Math.min(lines.length, 11);
+  logEl.innerHTML = lines.map(l => `<li class="${l.live ? 'live' : l.corp ? 'corp' : ''}"><time>${l.t}</time><span>${l.html}</span></li>`).join('');
+};
 
 // ================= пакеты данных =================
 const packets = [];
-function send(from, to, label, onArrive) {
+function send(from, to, label, onArrive, quiet) {
+  if (!from || !to) { if (onArrive) onArrive(); return; }
   const curve = arc(from, to), len = curve.getLength();
   const head = glow(from.col, 1.6, 1); scene.add(head);
   const trail = []; for (let i = 0; i < 7; i++) { const s = glow(from.col, 1.2 - i * .13, .5 - i * .06); scene.add(s); trail.push(s); }
-  packets.push({ curve, t: 0, dur: Math.max(2.4, len / 9), head, trail, onArrive });
+  packets.push({ from, to, t: 0, dur: Math.max(2.4, len / 9), head, trail, onArrive });
   from.pulse = 1;
-  logLine(`<b>${from.n}</b> → <b>${to.n}</b>  ${esc(label)}`);
+  if (!quiet) logLine(`<b>${esc(from.n)}</b> → <b>${esc(to.n)}</b>  ${esc(label)}`);
 }
 function stepPackets(dt) {
   for (let i = packets.length - 1; i >= 0; i--) {
     const p = packets[i]; p.t += dt / p.dur;
+    const curve = arc(p.from, p.to);
     const e = Math.min(1, p.t), te = e < .5 ? 2 * e * e : 1 - Math.pow(-2 * e + 2, 2) / 2;
-    p.head.position.copy(p.curve.getPoint(te));
-    p.trail.forEach((s, j) => s.position.copy(p.curve.getPoint(Math.max(0, te - (j + 1) * .018))));
+    p.head.position.copy(curve.getPoint(te));
+    p.trail.forEach((s, j) => s.position.copy(curve.getPoint(Math.max(0, te - (j + 1) * .018))));
     if (p.t >= 1) { scene.remove(p.head); p.trail.forEach(s => scene.remove(s)); packets.splice(i, 1); if (p.onArrive) p.onArrive(); }
   }
 }
 
-// ================= поведение агентов (реальное время) =================
+// ================= поведение =================
 let pipeBusy = false;
 function work(a, sec, label, then) { a.busy = sec; a.say = label; a.then = then; a.pulse = 1; }
 function videoRun() {
-  pipeBusy = true; const p = byId.prod;
-  send(dir, p, 'задание зрителя', () => work(p, 20 + Math.random() * 15, 'разбирает задание', () => step(0, p)));
+  pipeBusy = true; const p = byId.prod, d = byId.dir; if (!p) { pipeBusy = false; return; }
+  send(d, p, 'задание зрителя', () => work(p, 20 + Math.random() * 15, 'разбирает задание', () => step(0, p)));
 }
 function step(i, from) {
   if (i >= PIPE.length) {
     send(from, byId.prod, 'материалы ролика', () => work(byId.prod, 25, 'публикация', () =>
-      send(byId.prod, dir, 'ролик готов', () => { st.videos++; countTask(); reward('prod', 2); grow('dir', 1); pipeBusy = false; persist(); })));
+      send(byId.prod, byId.dir, 'ролик готов', () => { st.videos++; countTask(); reward('prod', 2); earn('dir', 80); grow('dir', 1); pipeBusy = false; persist(); })));
     return;
   }
-  const [id, label] = PIPE[i], to = byId[id];
+  const [id, label] = PIPE[i], to = byId[id]; if (!to) { step(i + 1, from); return; }
   send(from, to, label, () => work(to, 25 + Math.random() * 45, label, () => { countTask(); reward(id, 1); step(i + 1, to); }));
 }
 function soloRun(a) {
   a.pending = true;
-  const list = JOBS[a.id], job = list[Math.floor(Math.random() * list.length)];
-  send(dir, a, job, () => work(a, 30 + Math.random() * 70, job, () =>
-    send(a, dir, 'результат: ' + job, () => { countTask(); reward(a.id, 1); grow('dir', .3, true); a.pending = false; persist(); })));
+  const list = jobsFor(a), job = list[Math.floor(Math.random() * list.length)];
+  send(byId.dir, a, job, () => work(a, 30 + Math.random() * 70, job, () =>
+    send(a, byId.dir, 'результат: ' + job, () => { countTask(); reward(a.id, 1); grow('dir', .3, true); a.pending = false; persist(); })));
+}
+// --- кадровые циклы: Кадры сами решают, кого нанять или уволить
+let hrNext = 45 + Math.random() * 30, finNext = 600;
+function hrCycle() {
+  const hr = byId.hr, fin = byId.fin, dir = byId.dir;
+  const act = hrDecide(Date.now());
+  work(hr, 9, 'рассматривает кандидатов', null);
+  if (!act) return;
+  if (act.type === 'fire') {
+    const a = byId[act.id]; if (!a) return;
+    send(hr, dir, `приказ: ${a.n} — ${act.why}`, () => {
+      const r = applyAction(act, true, Date.now()); if (!r) return;
+      a.leaving = true; if (a.busy > 0) { a.busy = 0; a.then = null; } a.pending = false;
+      logLine(`<b>${esc(a.n)}</b> уволен: ${esc(act.why)}`, false, true); persist();
+    });
+    return;
+  }
+  send(fin, hr, `бюджет согласован: ${act.cost}`, () => {
+    const r = applyAction(act, true, Date.now()); if (!r) return;
+    const a = spawn(r.def, true); relayout();
+    logLine(act.type === 'opendept' ? `Открыт новый отдел «${esc(DEPT_NAME[act.dept])}», руководитель принят в штат` : `Принят в штат: <b>${esc(a.n)}</b> (${esc(DEPT_NAME[a.d])})`, false, true);
+    send(hr, a, 'оффер принят', () => { a.pulse = 1.5; }, true); persist();
+  });
 }
 function tick(dt) {
   AG.forEach(a => {
     if (a.busy > 0) { a.busy -= dt; if (a.busy <= 0) { a.busy = 0; a.say = ''; const f = a.then; a.then = null; if (f) f(); } return; }
-    if (a.id === 'dir' || a.pending) return;
+    if (a.id === 'dir' || a.pending || a.leaving || a.age < 6) return;
     a.next -= dt; if (a.next > 0) return;
     a.next = 50 + Math.random() * 160;
-    if (a.id === 'prod' && !pipeBusy) videoRun();
-    else if (JOBS[a.id]) soloRun(a);
+    if (a.id === 'prod' && !pipeBusy) videoRun(); else soloRun(a);
   });
+  // расходы вычислений: чем больше штат, тем дороже содержание
+  const up = heads() * 2.5 / 60 * dt; st.budget -= up; st.cost += up;
+  hrNext -= dt; if (hrNext <= 0) { hrNext = 70 + Math.random() * 80; hrCycle(); }
+  finNext -= dt; if (finNext <= 0) {
+    if (st.budget > 5000) { st.budget -= 2000; defs().forEach(d => grow(d.id, 3, true)); logLine('<b>Финансы</b>: 2000 направлено на развитие, агенты стали мощнее', false, true); }
+    finNext = 600; const net = Math.round((st.inc - st.cost) / 10);
+    logLine(`<b>Финансы</b>: бюджет ${Math.round(st.budget)}, итог за 10 мин ${net >= 0 ? '+' : ''}${net}`, false, true); st.inc = 0; st.cost = 0;
+  }
 }
 
 // ================= реальные статусы =================
@@ -334,7 +453,7 @@ const real = {};
       snap.docs.forEach(d => {
         const x = d.data(); if (!x || !byId[d.id]) return; seen[d.id] = 1;
         const prev = real[d.id]; real[d.id] = { state: String(x.state), task: String(x.task || '') };
-        if (real[d.id].state === 'working' && (!prev || prev.task !== real[d.id].task || prev.state !== 'working')) logLine(`<b>${byId[d.id].n}</b>  LIVE: ${esc(real[d.id].task)}`, true);
+        if (real[d.id].state === 'working' && (!prev || prev.task !== real[d.id].task || prev.state !== 'working')) logLine(`<b>${esc(byId[d.id].n)}</b>  LIVE: ${esc(real[d.id].task)}`, true);
       });
       Object.keys(real).forEach(id => { if (!seen[id]) delete real[id]; });
     }, () => {});
@@ -342,20 +461,29 @@ const real = {};
 })();
 
 // ================= интерфейс =================
-logLine('Сеть подключена, агенты онлайн');
-if (welcome) { const w = document.createElement('div'); w.className = 'welcome'; w.textContent = welcome; document.body.appendChild(w); setTimeout(() => w.remove(), 7000); }
+logLine(`Корпорация онлайн: ${heads() + 1} агентов, бюджет ${Math.round(st.budget)}`, false, true);
+if (welcome) { const w = document.createElement('div'); w.className = 'welcome'; w.textContent = welcome; document.body.appendChild(w); setTimeout(() => w.remove(), 8000); }
 const card = document.getElementById('card'); let sel = null;
 function renderCard() {
-  if (!sel) { card.hidden = true; document.body.classList.remove('sel'); return; }
-  const a = sel, s = st.agents[a.id], r = real[a.id], isLive = r && r.state === 'working';
+  if (!sel || !byId[sel.id]) { sel = null; card.hidden = true; document.body.classList.remove('sel'); return; }
+  const a = sel, s = st.agents[a.id] || { lvl: 1, xp: 0, done: 0 }, r = real[a.id], isLive = r && r.state === 'working';
+  const mins = a.born ? Math.max(1, Math.round((Date.now() - a.born) / 6e4)) : null;
   card.hidden = false; document.body.classList.add('sel');
   card.innerHTML = `<button class="close" type="button" aria-label="Закрыть">×</button>
-    <div class="eyebrow">${DIST[a.d]}</div>
-    <h3><i style="background:${a.c};box-shadow:0 0 12px ${a.c}"></i>${a.n}</h3>
-    <p>${a.who}</p>
-    <div class="kv"><div>Мощность<b>${s.lvl}</b></div><div>Выполнено<b>${s.done}</b></div><div>До роста<b>${Math.round(s.xp / need(s.lvl) * 100)}%</b></div></div>
+    <div class="eyebrow">${esc(DEPT_NAME[a.d])} · ${roleOf(s.lvl)}</div>
+    <h3><i style="background:${a.c};box-shadow:0 0 12px ${a.c}"></i>${esc(a.n)}</h3>
+    <p>${esc(a.who)}</p>
+    <div class="kv"><div>Мощность<b>${s.lvl}</b></div><div>Выполнено<b>${s.done}</b></div><div>${mins ? 'В штате' : 'Основатель'}<b>${mins ? (mins < 90 ? mins + ' мин' : Math.round(mins / 60) + ' ч') : 'с начала'}</b></div></div>
     <div class="state ${isLive ? 'live' : ''}">${isLive ? 'LIVE · ' + esc(r.task) : a.busy > 0 ? 'обрабатывает: ' + esc(a.say) + ` · ${Math.ceil(a.busy)} с` : a.pending ? 'обмен данными с ядром' : 'ожидает задачу'}</div>`;
   card.querySelector('.close').onclick = () => { sel = null; renderCard(); };
+}
+const orgEl = document.getElementById('org');
+function renderOrg() {
+  orgEl.innerHTML = ['c'].concat(st.depts).map(d => {
+    const m = AG.filter(a => a.d === d && !a.leaving); if (!m.length) return '';
+    const lead = m.slice().sort((x, y) => (st.agents[y.id] || { lvl: 0 }).lvl - (st.agents[x.id] || { lvl: 0 }).lvl)[0];
+    return `<li><span>${esc(DEPT_NAME[d])}</span><b>${m.length}</b><em>${esc(lead.n)}</em></li>`;
+  }).join('');
 }
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null;
 canvas.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
@@ -372,7 +500,7 @@ function daylight(now) {
   const alt = Math.sin((h - 6) / 12 * Math.PI);
   const day = THREE.MathUtils.clamp(alt * 1.8 + .15, 0, 1), dusk = THREE.MathUtils.clamp(1 - Math.abs(alt) * 3.5, 0, 1);
   sky.copy(skyNight).lerp(skyDay, day).lerp(skyDusk, dusk * .55);
-  scene.background = sky; scene.fog.color.copy(sky); scene.fog.density = .011 - day * .004;
+  scene.background = sky; scene.fog.color.copy(sky); scene.fog.density = .01 - day * .004;
   const az = (h - 6) / 12 * Math.PI;
   sun.position.set(Math.cos(az) * 80, Math.max(6, alt * 90), 30); sun.intensity = day * 1.05;
   hemi.intensity = .18 + day * .55;
@@ -386,18 +514,27 @@ function daylight(now) {
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 const v = new THREE.Vector3();
-let last = performance.now(), cardT = 0, saveT = 0;
-const clockEl = document.getElementById('clock'), dateEl = document.getElementById('date');
+let last = performance.now(), cardT = 0, saveT = 0, orgT = 99;
+const $ = id => document.getElementById(id);
+const clockEl = $('clock'), dateEl = $('date');
 function frame(t) {
   const dt = Math.min(.1, (t - last) / 1000); last = t; const now = new Date();
   tick(dt); stepPackets(dt);
   if (!controls.autoRotate && !reduce) { idleT += dt; if (idleT > 25) controls.autoRotate = true; }
-  let busy = 0, grew = false;
-  AG.forEach(a => {
-    const target = heightOf(a); if (Math.abs(target - a.h) > .01) { a.h += (target - a.h) * Math.min(1, dt * .8); grew = true; }
-    a.tower.scale.y = a.h; a.edges.scale.y = a.h; a.crown.position.y = a.h + .06; a.tex.repeat.set(1, a.h / 10);
-    corePos(a, a.core.position); a.core.position.y += Math.sin(t / 1400 + a.pos.x) * .25;
+  let busy = 0, count = 0; const deptBusy = {}, deptN = {};
+  for (let i = AG.length - 1; i >= 0; i--) {
+    const a = AG[i];
+    a.age += dt;
+    a.pos.lerp(a.tpos, Math.min(1, dt * 1.6));
+    a.g.position.copy(a.pos); if (a.id !== 'dir') a.g.rotation.y = Math.atan2(a.pos.x, a.pos.z);
+    const target = a.leaving ? 0 : heightOf(a); a.h += (target - a.h) * Math.min(1, dt * (a.leaving ? 1.4 : .8));
+    if (a.leaving && a.h < .15) { despawn(a); continue; }
+    count++;
+    const sc = Math.min(1, a.age * .5) * (a.leaving ? Math.max(0, a.h / 6) : 1);
+    a.tower.scale.y = Math.max(.01, a.h); a.edges.scale.y = Math.max(.01, a.h); a.crown.position.y = a.h + .06; a.tex.repeat.set(1, Math.max(.1, a.h / 10));
+    corePos(a, a.core.position); a.core.position.y += Math.sin(t / 1400 + a.pos.x) * .25; a.core.scale.setScalar(Math.max(.01, Math.min(1, sc + (a.leaving ? 0 : .0))));
     const working = a.busy > 0; if (working) busy++;
+    deptN[a.d] = (deptN[a.d] || 0) + 1; if (working || a.pending) deptBusy[a.d] = (deptBusy[a.d] || 0) + 1;
     a.pulse = Math.max(0, (a.pulse || 0) - dt * 1.5);
     a.orb.scale.setScalar((working ? 1 + Math.sin(t / 260) * .08 : 1) + a.pulse * .35);
     a.shell.rotation.y += dt * (working ? 1.4 : .25); a.shell.rotation.x += dt * .1;
@@ -407,29 +544,34 @@ function frame(t) {
     const r = real[a.id], isLive = !!(r && r.state === 'working');
     a.live.visible = isLive; if (isLive) { a.live.rotation.z += dt; a.live.material.opacity = .6 + Math.sin(t / 220) * .35; }
     v.copy(a.core.position); v.y += a.R * 2.4; v.project(camera);
-    const vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05; a.tag.hidden = !vis;
+    const showTag = isLive || working || a === sel || !a.born;
+    const vis = showTag && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && !a.leaving; a.tag.hidden = !vis;
     if (vis) {
       a.tag.style.left = ((v.x + 1) / 2 * innerWidth).toFixed(1) + 'px'; a.tag.style.top = ((1 - v.y) / 2 * innerHeight).toFixed(1) + 'px';
       const sub = isLive ? 'LIVE · ' + r.task : working ? a.say : '';
-      const html = `<b>${a.n}</b>${sub ? `<small>${esc(sub)}</small>` : ''}`;
+      const html = `<b>${esc(a.n)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}`;
       if (a.tag._h !== html) { a.tag.innerHTML = html; a.tag._h = html; a.tag.className = 'tag' + (isLive ? ' live' : ''); }
     }
-  });
-  if (grew) updateLinks();
+  }
+  st.load = {}; Object.keys(deptN).forEach(d => st.load[d] = (deptBusy[d] || 0) / deptN[d]);
+  updateLinks();
   dust.rotation.y += dt * .01;
   daylight(now);
   controls.update(); composer.render();
   clockEl.textContent = hhmmss(now);
   dateEl.textContent = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   if (st.day !== today()) { st.day = today(); st.tasksToday = 0; }
-  document.getElementById('mTasks').textContent = st.tasksToday;
-  document.getElementById('mVid').textContent = st.videos;
-  document.getElementById('mLoad').textContent = Math.round(busy / (AG.length - 1) * 100) + '%';
+  $('mHead').textContent = count; $('mBud').textContent = Math.round(st.budget).toLocaleString('ru-RU');
+  $('mTasks').textContent = st.tasksToday; $('mVid').textContent = st.videos;
+  $('mLoad').textContent = Math.round(busy / Math.max(1, count - 1) * 100) + '%';
+  $('mDep').textContent = st.depts.length; $('mHire').textContent = st.hiredTotal; $('mFire').textContent = st.firedTotal;
+  $('mBud').parentElement.classList.toggle('neg', st.budget < 0);
   cardT += dt; if (cardT > .5 && sel) { cardT = 0; renderCard(); }
+  orgT += dt; if (orgT > 2) { orgT = 0; renderOrg(); }
   saveT += dt; if (saveT > 10) { saveT = 0; persist(); }
   requestAnimationFrame(frame);
 }
 addEventListener('pagehide', persist);
-requestAnimationFrame(frame);
+updateLinks(); renderOrg(); requestAnimationFrame(frame);
 })();
 </script>
